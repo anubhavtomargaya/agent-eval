@@ -1,0 +1,432 @@
+from __future__ import annotations
+"""FastAPI application for the AI Agent Evaluation Pipeline.
+
+Endpoints:
+- POST /ingest - Ingest conversations from JSON body
+- POST /ingest/file - Ingest conversations from uploaded file
+- POST /evaluate/{conversation_id} - Evaluate a single conversation
+- POST /evaluate/batch - Evaluate multiple conversations
+- POST /evaluate/pending - Evaluate all pending conversations
+- GET /results/{conversation_id} - Get evaluation results
+- GET /results - List all evaluations
+- GET /conversations - List all conversations
+- GET /stats - Get summary statistics
+- GET /health - Health check
+"""
+
+from datetime import datetime
+from typing import Any
+from pathlib import Path
+import tempfile
+
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+from src.config import get_settings
+from src.db.repository import get_repository
+from src.ingestion.service import IngestionService, ValidationError
+from src.evaluation.service import EvaluationService, EvaluationError
+from src.evaluation.evaluators import get_global_registry, EvaluatorDiscovery
+
+
+# =============================================================================
+# Pydantic Models for API
+# =============================================================================
+
+class ToolCallInput(BaseModel):
+    """Tool call input schema."""
+    tool_name: str
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    result: Any | None = None
+    execution_time_ms: float | None = None
+
+
+class TurnInput(BaseModel):
+    """Turn input schema."""
+    turn_id: int | None = None
+    role: str
+    content: str
+    timestamp: str | None = None
+    latency_ms: float | None = None
+    tool_calls: list[ToolCallInput] = Field(default_factory=list)
+
+
+class ConversationInput(BaseModel):
+    """Conversation input schema."""
+    conversation_id: str | None = None
+    turns: list[TurnInput]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class BatchIngestInput(BaseModel):
+    """Batch ingestion input schema."""
+    conversations: list[ConversationInput]
+
+
+class BatchEvaluateInput(BaseModel):
+    """Batch evaluation input schema."""
+    conversation_ids: list[str]
+
+
+class IngestionResponse(BaseModel):
+    """Response for ingestion operations."""
+    total: int
+    success: int
+    failed: int
+    errors: list[str]
+    conversation_ids: list[str]
+
+
+class IssueResponse(BaseModel):
+    """Issue in evaluation response."""
+    issue_type: str
+    severity: str
+    description: str
+    turn_id: int | None = None
+    suggested_fix: str | None = None
+
+
+class EvaluatorResultResponse(BaseModel):
+    """Single evaluator result in response."""
+    evaluator_name: str
+    scores: dict[str, float]
+    issues: list[IssueResponse]
+    confidence: float
+    latency_ms: float | None = None
+
+
+class EvaluationResponse(BaseModel):
+    """Response for evaluation operations."""
+    conversation_id: str
+    run_id: str
+    timestamp: str
+    aggregate_score: float
+    status: str
+    evaluations: dict[str, EvaluatorResultResponse]
+    issues: list[IssueResponse]
+    issues_count: int
+
+
+class ConversationResponse(BaseModel):
+    """Response for conversation queries."""
+    conversation_id: str
+    turn_count: int
+    metadata: dict[str, Any]
+    created_at: str
+    has_evaluation: bool
+
+
+class StatsResponse(BaseModel):
+    """Response for statistics endpoint."""
+    total_conversations: int
+    total_evaluations: int
+    pending_evaluations: int
+    average_score: float
+    total_issues: int
+    issues_by_type: dict[str, int]
+    scores_by_evaluator: dict[str, float]
+
+
+class HealthResponse(BaseModel):
+    """Health check response."""
+    status: str
+    timestamp: str
+    version: str
+
+
+# =============================================================================
+# Application Factory
+# =============================================================================
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    
+    settings = get_settings()
+    
+    app = FastAPI(
+        title="AI Agent Evaluation Pipeline",
+        description="Modular evaluation framework for AI agent conversations",
+        version="0.1.0",
+        docs_url="/docs",
+        redoc_url="/redoc",
+    )
+    
+    # CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    # Initialize Registry and Discovery (Composition Root)
+    registry = get_global_registry()
+    EvaluatorDiscovery.discover_and_register(registry)
+    
+    repository = get_repository(data_dir="./data")
+    ingestion_service = IngestionService(repository)
+    evaluation_service = EvaluationService(
+        repository,
+        registry,
+        enabled_evaluators=settings.enabled_evaluators,
+    )
+    
+    # =========================================================================
+    # Health Check
+    # =========================================================================
+    
+    @app.get("/health", response_model=HealthResponse, tags=["Health"])
+    async def health_check():
+        """Health check endpoint."""
+        return HealthResponse(
+            status="healthy",
+            timestamp=datetime.utcnow().isoformat(),
+            version="0.1.0",
+        )
+    
+    # =========================================================================
+    # Ingestion Endpoints
+    # =========================================================================
+    
+    @app.post("/ingest", response_model=IngestionResponse, tags=["Ingestion"])
+    async def ingest_conversations(input_data: BatchIngestInput):
+        """Ingest conversations from JSON body.
+        
+        Accepts a list of conversations and validates/stores them.
+        """
+        conversations = [c.model_dump() for c in input_data.conversations]
+        result = ingestion_service.ingest_batch(conversations)
+        
+        return IngestionResponse(
+            total=result.total,
+            success=result.success,
+            failed=result.failed,
+            errors=list(result.errors),
+            conversation_ids=list(result.conversation_ids),
+        )
+    
+    @app.post("/ingest/single", response_model=IngestionResponse, tags=["Ingestion"])
+    async def ingest_single_conversation(conversation: ConversationInput):
+        """Ingest a single conversation."""
+        try:
+            conv = ingestion_service.ingest_single(conversation.model_dump())
+            return IngestionResponse(
+                total=1,
+                success=1,
+                failed=0,
+                errors=[],
+                conversation_ids=[conv.conversation_id],
+            )
+        except ValidationError as e:
+            return IngestionResponse(
+                total=1,
+                success=0,
+                failed=1,
+                errors=[str(e)],
+                conversation_ids=[],
+            )
+    
+    @app.post("/ingest/file", response_model=IngestionResponse, tags=["Ingestion"])
+    async def ingest_from_file(file: UploadFile = File(...)):
+        """Ingest conversations from an uploaded JSON file."""
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+        
+        try:
+            result = ingestion_service.ingest_from_file(tmp_path)
+            return IngestionResponse(
+                total=result.total,
+                success=result.success,
+                failed=result.failed,
+                errors=list(result.errors),
+                conversation_ids=list(result.conversation_ids),
+            )
+        finally:
+            # Clean up temp file
+            Path(tmp_path).unlink(missing_ok=True)
+    
+    @app.post("/ingest/pending", tags=["Ingestion"])
+    async def ingest_pending(pending_dir: str = Query(default="data/pending")):
+        """Process all JSON files in the pending directory."""
+        return ingestion_service.ingest_pending(pending_dir)
+    
+    # =========================================================================
+    # Evaluation Endpoints
+    # =========================================================================
+    
+    @app.post("/evaluate/batch", response_model=list[EvaluationResponse], tags=["Evaluation"])
+    async def evaluate_batch(input_data: BatchEvaluateInput):
+        """Evaluate multiple conversations by ID."""
+        results = evaluation_service.evaluate_batch(input_data.conversation_ids)
+        return [_evaluation_to_response(r) for r in results]
+    
+    @app.post("/evaluate/pending", response_model=list[EvaluationResponse], tags=["Evaluation"])
+    async def evaluate_pending(force: bool = Query(default=False)):
+        """Evaluate all conversations that haven't been evaluated yet."""
+        results = evaluation_service.evaluate_pending(force=force)
+        return [_evaluation_to_response(r) for r in results]
+
+    @app.post("/evaluate/{conversation_id}", response_model=EvaluationResponse, tags=["Evaluation"])
+    async def evaluate_conversation(conversation_id: str):
+        """Evaluate a single conversation by ID."""
+        try:
+            result = evaluation_service.evaluate(conversation_id)
+            return _evaluation_to_response(result)
+        except EvaluationError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+    
+    # =========================================================================
+    # Results Endpoints
+    # =========================================================================
+    
+    @app.get("/results/{conversation_id}", response_model=EvaluationResponse, tags=["Results"])
+    async def get_evaluation_result(conversation_id: str):
+        """Get evaluation results for a conversation."""
+        result = evaluation_service.get_evaluation(conversation_id)
+        if result is None:
+            raise HTTPException(status_code=404, detail=f"No evaluation found for conversation: {conversation_id}")
+        return _evaluation_to_response(result)
+    
+    @app.get("/results", response_model=list[EvaluationResponse], tags=["Results"])
+    async def list_evaluations(
+        limit: int = Query(default=100, le=1000),
+        offset: int = Query(default=0, ge=0),
+    ):
+        """List all evaluations with pagination."""
+        results = evaluation_service.list_evaluations(limit=limit, offset=offset)
+        return [_evaluation_to_response(r) for r in results]
+    
+    # =========================================================================
+    # Conversation Endpoints
+    # =========================================================================
+    
+    @app.get("/conversations", response_model=list[ConversationResponse], tags=["Conversations"])
+    async def list_conversations(
+        limit: int = Query(default=100, le=1000),
+        offset: int = Query(default=0, ge=0),
+    ):
+        """List all conversations with pagination."""
+        conversations = repository.list_conversations(limit=limit, offset=offset)
+        responses = []
+        for conv in conversations:
+            eval_result = repository.get_evaluation(conv.conversation_id)
+            responses.append(ConversationResponse(
+                conversation_id=conv.conversation_id,
+                turn_count=len(conv.turns),
+                metadata=conv.metadata,
+                created_at=conv.created_at.isoformat(),
+                has_evaluation=eval_result is not None,
+            ))
+        return responses
+    
+    @app.get("/conversations/{conversation_id}", tags=["Conversations"])
+    async def get_conversation(conversation_id: str):
+        """Get a conversation by ID with full details."""
+        conv = repository.get_conversation(conversation_id)
+        if conv is None:
+            raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
+        
+        return {
+            "conversation_id": conv.conversation_id,
+            "metadata": conv.metadata,
+            "created_at": conv.created_at.isoformat(),
+            "turns": [
+                {
+                    "turn_id": t.turn_id,
+                    "role": t.role.value,
+                    "content": t.content,
+                    "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+                    "latency_ms": t.latency_ms,
+                    "tool_calls": [
+                        {
+                            "tool_name": tc.tool_name,
+                            "parameters": tc.parameters,
+                            "result": tc.result,
+                        }
+                        for tc in t.tool_calls
+                    ],
+                }
+                for t in conv.turns
+            ],
+        }
+    
+    # =========================================================================
+    # Statistics Endpoints
+    # =========================================================================
+    
+    @app.get("/stats", response_model=StatsResponse, tags=["Statistics"])
+    async def get_stats():
+        """Get summary statistics for all evaluations."""
+        stats = evaluation_service.get_summary_stats()
+        conversations = repository.list_conversations(limit=10000)
+        pending = repository.get_pending_conversations()
+        
+        return StatsResponse(
+            total_conversations=len(conversations),
+            total_evaluations=stats["total_evaluations"],
+            pending_evaluations=len(pending),
+            average_score=stats["average_score"],
+            total_issues=stats["total_issues"],
+            issues_by_type=stats["issues_by_type"],
+            scores_by_evaluator=stats["scores_by_evaluator"],
+        )
+    
+    return app
+
+
+def _evaluation_to_response(result) -> EvaluationResponse:
+    """Convert EvaluationResult to API response model."""
+    evaluations = {}
+    for name, eval_result in result.evaluations.items():
+        evaluations[name] = EvaluatorResultResponse(
+            evaluator_name=eval_result.evaluator_name,
+            scores=eval_result.scores,
+            issues=[
+                IssueResponse(
+                    issue_type=i.issue_type.value,
+                    severity=i.severity.value,
+                    description=i.description,
+                    turn_id=i.turn_id,
+                    suggested_fix=i.suggested_fix,
+                )
+                for i in eval_result.issues
+            ],
+            confidence=eval_result.confidence,
+            latency_ms=eval_result.latency_ms,
+        )
+    
+    return EvaluationResponse(
+        conversation_id=result.conversation_id,
+        run_id=result.run_id,
+        timestamp=result.timestamp.isoformat(),
+        aggregate_score=result.aggregate_score,
+        status=result.status,
+        evaluations=evaluations,
+        issues=[
+            IssueResponse(
+                issue_type=i.issue_type.value,
+                severity=i.severity.value,
+                description=i.description,
+                turn_id=i.turn_id,
+                suggested_fix=i.suggested_fix,
+            )
+            for i in result.issues
+        ],
+        issues_count=len(result.issues),
+    )
+
+
+# Create default app instance
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+    settings = get_settings()
+    uvicorn.run(app, host=settings.api_host, port=settings.api_port)
+
