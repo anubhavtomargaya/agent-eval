@@ -26,7 +26,6 @@ class EvaluatorDiscovery:
                 # Importing the module triggers the @register_evaluator decorator
                 importlib.import_module(module_path)
                 loaded_modules.append(module_path)
-                print(f"DEBUG: Discovered and loaded strategy module: {module_path}")
             except Exception as e:
                 print(f"Warning: Discovery failed for {module_path}: {e}")
                 

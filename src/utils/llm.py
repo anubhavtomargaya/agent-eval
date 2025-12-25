@@ -13,11 +13,14 @@ class LLMClientFactory:
     
     def __init__(self):
         settings = get_settings()
-        # Use OPENAI_KEY from env as requested
-        api_key = settings.openai_key or os.getenv("OPENAI_KEY")
-        print(f"DEBUG: Initializing simple OpenAI client (Key present: {bool(api_key)})")
-        self.client = OpenAI(api_key=api_key)
+        # Use effective_openai_key which checks both openai_key and openai_api_key
+        api_key = settings.effective_openai_key or os.getenv("OPENAI_KEY") or os.getenv("OPENAI_API_KEY")
+        
+        if api_key:
+            self.client = OpenAI(api_key=api_key)
+        else:
+            self.client = None
 
     def get_client(self):
-        """Return the standard OpenAI client."""
+        """Return the standard OpenAI client (or None if in mock mode)."""
         return self.client

@@ -135,6 +135,37 @@ class HealthResponse(BaseModel):
     version: str
 
 
+class ScoreDeltaResponse(BaseModel):
+    """Score change in regression testing."""
+    metric_name: str
+    old_val: float
+    new_val: float
+    is_improvement: bool
+
+
+class RegressionReportResponse(BaseModel):
+    """Regression test results."""
+    run_id: str
+    timestamp: str
+    test_case_count: int
+    overall_improvement: bool
+    score_deltas: list[ScoreDeltaResponse]
+
+
+class ImprovementProposalResponse(BaseModel):
+    """Response for improvement proposals."""
+    proposal_id: str
+    type: str
+    failure_pattern: str
+    rationale: str
+    original_content: str
+    proposed_content: str
+    status: str
+    created_at: str
+    regression_report: RegressionReportResponse | None = None
+    evidence_count: int
+
+
 # =============================================================================
 # Application Factory
 # =============================================================================
@@ -172,6 +203,10 @@ def create_app() -> FastAPI:
         registry,
         enabled_evaluators=settings.enabled_evaluators,
     )
+    
+    # Lazy import to avoid circular dependencies if any
+    from src.analysis.service import AnalysisService
+    analysis_service = AnalysisService(repository, evaluation_service)
     
     # =========================================================================
     # Health Check
@@ -376,6 +411,44 @@ def create_app() -> FastAPI:
             scores_by_evaluator=stats["scores_by_evaluator"],
         )
     
+    # =========================================================================
+    # Analysis Endpoints
+    # =========================================================================
+    
+    @app.post("/analysis/run", response_model=list[ImprovementProposalResponse], tags=["Analysis"])
+    async def run_analysis(limit: int = Query(default=100, le=500)):
+        """Trigger a full analysis cycle (Cluster failures -> Generate Suggestions)."""
+        proposals = analysis_service.run_analysis_cycle(limit=limit)
+        return [_proposal_to_response(p) for p in proposals]
+    
+    @app.get("/analysis/proposals", response_model=list[ImprovementProposalResponse], tags=["Analysis"])
+    async def list_proposals(
+        limit: int = Query(default=50, le=100),
+        offset: int = Query(default=0, ge=0)
+    ):
+        """List all generated improvement proposals."""
+        proposals = repository.list_proposals(limit=limit, offset=offset)
+        return [_proposal_to_response(p) for p in proposals]
+    
+    @app.get("/analysis/proposals/{proposal_id}", response_model=ImprovementProposalResponse, tags=["Analysis"])
+    async def get_proposal(proposal_id: str):
+        """Get details of a specific proposal."""
+        proposal = repository.get_proposal(proposal_id)
+        if not proposal:
+            raise HTTPException(status_code=404, detail="Proposal not found")
+        return _proposal_to_response(proposal)
+    
+    @app.post("/analysis/proposals/{proposal_id}/verify", response_model=RegressionReportResponse, tags=["Analysis"])
+    async def verify_proposal(proposal_id: str):
+        """Run regression testing for a proposal."""
+        try:
+            report = analysis_service.verify_proposal(proposal_id)
+            return _report_to_response(report)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
     return app
 
 
@@ -418,6 +491,41 @@ def _evaluation_to_response(result) -> EvaluationResponse:
             for i in result.issues
         ],
         issues_count=len(result.issues),
+    )
+
+
+def _proposal_to_response(proposal: Any) -> ImprovementProposalResponse:
+    """Convert ImprovementProposal to API response."""
+    return ImprovementProposalResponse(
+        proposal_id=proposal.proposal_id,
+        type=proposal.type.value,
+        failure_pattern=proposal.failure_pattern,
+        rationale=proposal.rationale,
+        original_content=proposal.original_content,
+        proposed_content=proposal.proposed_content,
+        status=proposal.status.value,
+        created_at=proposal.created_at.isoformat(),
+        regression_report=_report_to_response(proposal.regression_report) if proposal.regression_report else None,
+        evidence_count=len(proposal.evidence_ids)
+    )
+
+
+def _report_to_response(report: Any) -> RegressionReportResponse:
+    """Convert RegressionReport to API response."""
+    return RegressionReportResponse(
+        run_id=report.run_id,
+        timestamp=report.timestamp.isoformat(),
+        test_case_count=report.test_case_count,
+        overall_improvement=report.overall_improvement,
+        score_deltas=[
+            ScoreDeltaResponse(
+                metric_name=d.metric_name,
+                old_val=d.old_val,
+                new_val=d.new_val,
+                is_improvement=d.is_improvement
+            )
+            for d in report.score_deltas
+        ]
     )
 
 
