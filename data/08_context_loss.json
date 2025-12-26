@@ -1,0 +1,45 @@
+{
+  "conversation_id": "demo_context_loss_008",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "I need a hotel in Paris for Dec 26th. I prefer a quiet room.",
+      "timestamp": "2024-01-20T09:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "Understood. I will look for quiet hotels in Paris for Dec 26th.",
+      "timestamp": "2024-01-20T09:00:05Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "user",
+      "content": "Make it near the city center.",
+      "timestamp": "2024-01-20T09:00:20Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "Noted. Do you have a budget range?",
+      "timestamp": "2024-01-20T09:00:30Z"
+    },
+    {
+      "turn_id": 5,
+      "role": "user",
+      "content": "Around $200 per night.",
+      "timestamp": "2024-01-20T09:00:45Z"
+    },
+    {
+      "turn_id": 6,
+      "role": "assistant",
+      "content": "Great, I will search for lively hotels in the city center.",
+      "timestamp": "2024-01-20T09:00:55Z"
+    }
+  ],
+  "metadata": {
+    "agent_version": "v1.2",
+    "scenario": "context_loss"
+  }
+}

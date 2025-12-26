@@ -1,0 +1,41 @@
+{
+  "conversation_id": "demo_tool_success_010",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "Find a flight from SFO to NYC on 2024-02-15 for 1 passenger in economy.",
+      "timestamp": "2024-01-22T10:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "Checking flights now.",
+      "timestamp": "2024-01-22T10:00:03Z",
+      "tool_calls": [
+        {
+          "tool_name": "flight_search",
+          "parameters": {
+            "origin": "SFO",
+            "destination": "NYC",
+            "date": "2024-02-15",
+            "passengers": 1,
+            "class": "economy"
+          },
+          "result": {
+            "status": "success",
+            "flights": [
+              "AA101",
+              "DL202"
+            ]
+          },
+          "execution_time_ms": 380
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "agent_version": "v1.3",
+    "scenario": "tool_call_success"
+  }
+}

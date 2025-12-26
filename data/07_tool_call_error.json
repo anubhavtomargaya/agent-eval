@@ -1,0 +1,37 @@
+{
+  "conversation_id": "demo_tool_error_007",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "Book a flight from LAX to BOS on 2024-03-05 for 2 passengers in economy",
+      "timestamp": "2024-01-20T10:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "Searching flights now.",
+      "timestamp": "2024-01-20T10:00:02Z",
+      "tool_calls": [
+        {
+          "tool_name": "flight_search",
+          "parameters": {
+            "origin": "LAX",
+            "destination": "BOS",
+            "date": "2024/03/05",
+            "passengers": 2,
+            "class": "economy"
+          },
+          "result": {
+            "error": "Invalid date format. Expected YYYY-MM-DD."
+          },
+          "execution_time_ms": 420
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "agent_version": "v1.2",
+    "scenario": "tool_call_regression"
+  }
+}

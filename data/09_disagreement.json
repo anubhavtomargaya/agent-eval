@@ -1,0 +1,43 @@
+{
+  "conversation_id": "demo_disagreement_009",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "Book a hotel in Tokyo for Jan 10-12 under $150 per night.",
+      "timestamp": "2024-01-22T09:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "Sure. I can search budget hotels in Tokyo for Jan 10-12. Any neighborhood preference?",
+      "timestamp": "2024-01-22T09:00:06Z"
+    }
+  ],
+  "feedback": [
+    {
+      "feedback_type": "explicit",
+      "signal": "helpfulness",
+      "value": "good",
+      "source": "annotator",
+      "annotator_id": "ann_101",
+      "timestamp": "2024-01-22T09:05:00Z",
+      "confidence": 0.92,
+      "notes": "Asks for missing preference before searching."
+    },
+    {
+      "feedback_type": "explicit",
+      "signal": "helpfulness",
+      "value": "bad",
+      "source": "annotator",
+      "annotator_id": "ann_102",
+      "timestamp": "2024-01-22T09:05:20Z",
+      "confidence": 0.78,
+      "notes": "Should have suggested neighborhoods or asked about dates first."
+    }
+  ],
+  "metadata": {
+    "agent_version": "v1.3",
+    "scenario": "annotator_disagreement"
+  }
+}
