@@ -411,19 +411,70 @@ async function fetchAndrenderScores(conversationId) {
     try {
         const data = await ApiClient.getResults(conversationId);
 
-        let html = `<div style="font-weight:600; color:var(--text-primary); margin-right:8px;">Aggregate: ${data.aggregate_score.toFixed(2)}</div>`;
+        let html = `
+            <div style="font-weight:600; color:var(--text-primary); margin-right:8px;">
+                Aggregate: ${data.aggregate_score.toFixed(2)} • Issues: ${data.issues_count}
+            </div>
+            <div style="font-size:11px; color:var(--text-secondary);">
+                Status: ${data.status} • ${new Date(data.timestamp).toLocaleString()}
+            </div>
+        `;
 
         if (data.issues && data.issues.length > 0) {
-            html += data.issues.map(i => `
-                <span style="background:rgba(248, 81, 73, 0.2); color:#ff7b72; padding:2px 6px; border-radius:10px; border:1px solid rgba(248, 81, 73, 0.4); margin-right:4px;">
-                    ${i.issue_type}
-                </span>
-            `).join('');
+            html += `
+                <div style="margin-left:auto; display:flex; gap:6px; flex-wrap:wrap;">
+                    ${data.issues.map(i => `
+                        <span style="background:rgba(248, 81, 73, 0.2); color:#ff7b72; padding:2px 6px; border-radius:10px; border:1px solid rgba(248, 81, 73, 0.4);">
+                            ${i.issue_type}
+                        </span>
+                    `).join('')}
+                </div>
+            `;
         } else {
-            html += `<span style="color:var(--success-color);">No Issues</span>`;
+            html += `<span style="margin-left:auto; color:var(--success-color);">No Issues</span>`;
         }
 
         container.innerHTML = html;
+
+        const detailContainer = document.createElement('div');
+        detailContainer.style.padding = '12px 20px';
+        detailContainer.style.background = 'var(--bg-secondary)';
+        detailContainer.style.borderBottom = '1px solid var(--border-color)';
+        detailContainer.style.fontSize = '12px';
+        detailContainer.style.display = 'flex';
+        detailContainer.style.flexDirection = 'column';
+        detailContainer.style.gap = '8px';
+
+        const evaluators = data.evaluations || {};
+        const evaluatorKeys = Object.keys(evaluators);
+        if (evaluatorKeys.length === 0) {
+            detailContainer.innerHTML = '<span style="color:var(--text-secondary);">No evaluator details available.</span>';
+        } else {
+            detailContainer.innerHTML = evaluatorKeys.map(key => {
+                const evalResult = evaluators[key];
+                const scores = Object.entries(evalResult.scores || {})
+                    .map(([name, value]) => `${name}: ${value.toFixed(2)}`)
+                    .join(' • ');
+                const issues = (evalResult.issues || []).map(i => `${i.issue_type}${i.turn_id !== null ? ` (turn ${i.turn_id})` : ''}`).join(', ');
+                return `
+                    <details style="background:var(--bg-tertiary); border:1px solid var(--border-color); border-radius:6px; padding:8px;">
+                        <summary style="cursor:pointer; font-weight:600; color:var(--accent-color); text-transform:uppercase; font-size:11px;">
+                            ${evalResult.evaluator_name} • Confidence ${evalResult.confidence.toFixed(2)}
+                        </summary>
+                        <div style="margin-top:6px; color:var(--text-secondary);">${scores || 'No scores reported.'}</div>
+                        <div style="margin-top:6px; color:${issues ? '#ff7b72' : 'var(--success-color)'};">
+                            ${issues ? `Issues: ${issues}` : 'Issues: none'}
+                        </div>
+                    </details>
+                `;
+            }).join('');
+        }
+
+        const chatPanel = document.querySelector('.chat-panel');
+        const existing = document.getElementById('evaluation-details');
+        if (existing) existing.remove();
+        detailContainer.id = 'evaluation-details';
+        chatPanel.insertBefore(detailContainer, document.getElementById('chat-stream'));
 
     } catch (e) {
         container.innerHTML = '<span style="color:#666; font-style:italic;">Not evaluated yet</span>';

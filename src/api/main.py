@@ -623,10 +623,14 @@ def create_app() -> FastAPI:
     async def verify_proposal_real(proposal_id: str):
         """Run a real regression using the demo agent and fixed prompt set."""
         try:
-            prompts_path = Path("data/regression_prompts.json")
-            if not prompts_path.exists():
-                raise HTTPException(status_code=404, detail="regression_prompts.json not found")
-            prompts = json.loads(prompts_path.read_text())
+            prompts_path = Path("artifacts/regression_prompts.json")
+            if prompts_path.exists():
+                prompts = json.loads(prompts_path.read_text())
+            else:
+                prompts = [
+                    "Book a flight from SFO to NYC on 2024-01-22 for 1 passenger in economy.",
+                    "Find a hotel in Paris for Dec 26th under $150 per night.",
+                ]
             report = analysis_service.run_real_regression(proposal_id, prompts)
             return _report_to_response(report)
         except HTTPException:
