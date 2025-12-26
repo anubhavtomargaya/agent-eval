@@ -167,7 +167,8 @@ class InMemoryRepository(ConversationRepository):
                         status=ProposalStatus(item["status"]),
                         evidence_ids=item["evidence_ids"],
                         created_at=datetime.fromisoformat(item["created_at"]),
-                        regression_report=report
+                        regression_report=report,
+                        metadata=item.get("metadata", {})
                     )
                     self._proposals[prop.proposal_id] = prop
             except Exception:
@@ -201,7 +202,8 @@ class InMemoryRepository(ConversationRepository):
                     "status": p.status.value if hasattr(p.status, "value") else p.status,
                     "evidence_ids": p.evidence_ids,
                     "created_at": p.created_at.isoformat(),
-                    "regression_report": None
+                    "regression_report": None,
+                    "metadata": p.metadata
                 }
                 
                 if p.regression_report:

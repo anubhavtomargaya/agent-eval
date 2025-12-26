@@ -48,13 +48,41 @@ class AnalysisService:
         print(f"DEBUG: Discovery phase identified {len(clusters)} distinct failure patterns.")
         
         # 4. Generate Suggestions for and each cluster
-        # Note: We'd normally need the 'current_prompt'. For demo, we'll use a placeholder.
+        # Note: We'd normally need the 'current_prompt' and tool schemas.
         current_prompt = "You are a helpful travel assistant. Always use YYYY-MM-DD for dates."
+        
+        # Mock tool definitions for the demo
+        tool_definitions = {
+            "hotel_search": {
+                "name": "hotel_search",
+                "description": "Search for hotels in a city",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                        "check_in": {"type": "string", "description": "Check-in date"},
+                        "guests": {"type": "integer"}
+                    }
+                }
+            },
+            "flight_booker": {
+                "name": "flight_booker",
+                "description": "Book a flight manually",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "origin": {"type": "string"},
+                        "destination": {"type": "string"},
+                        "date": {"type": "string"}
+                    }
+                }
+            }
+        }
         
         proposals = []
         for cluster in clusters:
             print(f"DEBUG: Generating improvement proposal for pattern: '{cluster.label}' (Significance: {cluster.significance_score:.1f})")
-            proposal = self.suggestion_engine.generate_proposal(cluster, current_prompt)
+            proposal = self.suggestion_engine.generate_proposal(cluster, current_prompt, tool_definitions)
             # Persist the proposal
             self.repository.save_proposal(proposal)
             proposals.append(proposal)

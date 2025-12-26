@@ -164,6 +164,7 @@ class ImprovementProposalResponse(BaseModel):
     created_at: str
     regression_report: RegressionReportResponse | None = None
     evidence_count: int
+    metadata: dict[str, Any] = {}
 
 
 # =============================================================================
@@ -506,7 +507,8 @@ def _proposal_to_response(proposal: Any) -> ImprovementProposalResponse:
         status=proposal.status.value,
         created_at=proposal.created_at.isoformat(),
         regression_report=_report_to_response(proposal.regression_report) if proposal.regression_report else None,
-        evidence_count=len(proposal.evidence_ids)
+        evidence_count=len(proposal.evidence_ids),
+        metadata=proposal.metadata
     )
 
 
