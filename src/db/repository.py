@@ -72,6 +72,21 @@ class ConversationRepository(ABC):
         """Get IDs of conversations that haven't been evaluated."""
         pass
 
+    @abstractmethod
+    def save_proposal(self, proposal: Any) -> str:
+        """Save an improvement proposal."""
+        pass
+
+    @abstractmethod
+    def get_proposal(self, proposal_id: str) -> Any | None:
+        """Get a proposal by ID."""
+        pass
+
+    @abstractmethod
+    def list_proposals(self, limit: int = 100, offset: int = 0) -> list[Any]:
+        """List proposals with pagination."""
+        pass
+
 
 class InMemoryRepository(ConversationRepository):
     """In-memory repository with optional file persistence.
@@ -83,6 +98,8 @@ class InMemoryRepository(ConversationRepository):
     def __init__(self, data_dir: str | Path | None = None):
         self._conversations: dict[str, Conversation] = {}
         self._evaluations: dict[str, EvaluationResult] = {}
+        self._proposals: dict[str, Any] = {}
+        self._proposal_types: dict[str, str] = {} # Helper for serialization mapping
         self._data_dir = Path(data_dir) if data_dir else None
         
         if self._data_dir:
@@ -93,6 +110,7 @@ class InMemoryRepository(ConversationRepository):
         """Load data from JSON files if they exist."""
         conv_file = self._data_dir / "conversations.json"
         eval_file = self._data_dir / "evaluations.json"
+        prop_file = self._data_dir / "proposals.json"
         
         if conv_file.exists():
             try:
@@ -111,6 +129,50 @@ class InMemoryRepository(ConversationRepository):
                     self._evaluations[evaluation.conversation_id] = evaluation
             except Exception:
                 pass
+
+        if prop_file.exists():
+            try:
+                # Lazy import to avoid circular dependency
+                from src.analysis.models import ImprovementProposal, ImprovementType, ProposalStatus, RegressionReport, ScoreDelta
+                data = json.loads(prop_file.read_text())
+                for item in data:
+                    # Reconstruction
+                    report = None
+                    if item.get("regression_report"):
+                        r_data = item["regression_report"]
+                        deltas = [
+                            ScoreDelta(
+                                metric_name=d["metric_name"],
+                                old_val=d["old_val"],
+                                new_val=d["new_val"],
+                                is_improvement=d["is_improvement"]
+                            )
+                            for d in r_data.get("score_deltas", [])
+                        ]
+                        report = RegressionReport(
+                            run_id=r_data["run_id"],
+                            timestamp=datetime.fromisoformat(r_data["timestamp"]),
+                            test_case_count=r_data["test_case_count"],
+                            overall_improvement=r_data["overall_improvement"],
+                            score_deltas=deltas
+                        )
+
+                    prop = ImprovementProposal(
+                        proposal_id=item["proposal_id"],
+                        type=ImprovementType(item["type"]),
+                        failure_pattern=item["failure_pattern"],
+                        rationale=item["rationale"],
+                        original_content=item["original_content"],
+                        proposed_content=item["proposed_content"],
+                        status=ProposalStatus(item["status"]),
+                        evidence_ids=item["evidence_ids"],
+                        created_at=datetime.fromisoformat(item["created_at"]),
+                        regression_report=report,
+                        metadata=item.get("metadata", {})
+                    )
+                    self._proposals[prop.proposal_id] = prop
+            except Exception:
+                pass
     
     def _save_to_disk(self) -> None:
         """Save data to JSON files."""
@@ -119,12 +181,51 @@ class InMemoryRepository(ConversationRepository):
         
         conv_file = self._data_dir / "conversations.json"
         eval_file = self._data_dir / "evaluations.json"
+        prop_file = self._data_dir / "proposals.json"
         
         conv_data = [self._conversation_to_dict(c) for c in self._conversations.values()]
         eval_data = [self._evaluation_to_dict(e) for e in self._evaluations.values()]
         
         conv_file.write_text(json.dumps(conv_data, indent=2, default=str))
         eval_file.write_text(json.dumps(eval_data, indent=2, default=str))
+
+        if self._proposals:
+            prop_data = []
+            for p in self._proposals.values():
+                p_dict = {
+                    "proposal_id": p.proposal_id,
+                    "type": p.type.value if hasattr(p.type, "value") else p.type,
+                    "failure_pattern": p.failure_pattern,
+                    "rationale": p.rationale,
+                    "original_content": p.original_content,
+                    "proposed_content": p.proposed_content,
+                    "status": p.status.value if hasattr(p.status, "value") else p.status,
+                    "evidence_ids": p.evidence_ids,
+                    "created_at": p.created_at.isoformat(),
+                    "regression_report": None,
+                    "metadata": p.metadata
+                }
+                
+                if p.regression_report:
+                    r = p.regression_report
+                    p_dict["regression_report"] = {
+                        "run_id": r.run_id,
+                        "timestamp": r.timestamp.isoformat(),
+                        "test_case_count": r.test_case_count,
+                        "overall_improvement": r.overall_improvement,
+                        "score_deltas": [
+                            {
+                                "metric_name": d.metric_name,
+                                "old_val": d.old_val,
+                                "new_val": d.new_val,
+                                "is_improvement": d.is_improvement
+                            }
+                            for d in r.score_deltas
+                        ]
+                    }
+                
+                prop_data.append(p_dict)
+            prop_file.write_text(json.dumps(prop_data, indent=2))
     
     def _conversation_to_dict(self, conv: Conversation) -> dict[str, Any]:
         """Convert Conversation to dictionary for JSON serialization."""
@@ -339,6 +440,22 @@ class InMemoryRepository(ConversationRepository):
             cid for cid in self._conversations.keys()
             if cid not in evaluated_ids
         ]
+
+    def save_proposal(self, proposal: Any) -> str:
+        """Save an improvement proposal."""
+        self._proposals[proposal.proposal_id] = proposal
+        self._save_to_disk()
+        return proposal.proposal_id
+
+    def get_proposal(self, proposal_id: str) -> Any | None:
+        """Get a proposal by ID."""
+        return self._proposals.get(proposal_id)
+
+    def list_proposals(self, limit: int = 100, offset: int = 0) -> list[Any]:
+        """List proposals with pagination."""
+        proposals = list(self._proposals.values())
+        proposals.sort(key=lambda p: p.created_at, reverse=True)
+        return proposals[offset:offset + limit]
 
 
 # Global repository instance

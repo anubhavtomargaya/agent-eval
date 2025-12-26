@@ -1,0 +1,115 @@
+from typing import List
+from src.analysis.models import ImprovementProposal, RegressionReport
+from src.analysis.clustering import ClusteringEngine
+from src.analysis.suggestions import SuggestionEngine
+from src.analysis.regression import RegressionTester
+from src.analysis.adapter import prepare_batch_data
+from src.db.repository import ConversationRepository
+from src.evaluation.service import EvaluationService
+
+class AnalysisService:
+    """The orchestrator for the Analysis Module."""
+    
+    def __init__(
+        self, 
+        repository: ConversationRepository,
+        evaluation_service: EvaluationService
+    ):
+        self.repository = repository
+        self.evaluation_service = evaluation_service
+        self.clustering_engine = ClusteringEngine()
+        self.suggestion_engine = SuggestionEngine()
+        self.regression_tester = RegressionTester(evaluation_service)
+
+    def run_analysis_cycle(self, limit: int = 100) -> List[ImprovementProposal]:
+        """Run a full cycle of discovery: Cluster -> Suggest."""
+        
+        # 1. Fetch recent evaluations and conversations
+        evals = self.repository.list_evaluations(limit=limit)
+        # Filter for only those with issues
+        evals_with_issues = [e for e in evals if e.issues]
+        
+        print(f"DEBUG: Analysis discovery found {len(evals_with_issues)} evaluations with issues out of {len(evals)} reviewed.")
+        
+        if not evals_with_issues:
+            return []
+            
+        conv_ids = [e.conversation_id for e in evals_with_issues]
+        # In a real system, we'd batch fetch. Here we loop for simplicity.
+        convs = [self.repository.get_conversation(cid) for cid in conv_ids]
+        convs = [c for c in convs if c] # Filter None
+        
+        # 2. Transform into flattened items
+        flattened_items = prepare_batch_data(evals_with_issues, convs)
+        
+        # 3. Cluster
+        print(f"DEBUG: Clustering {len(flattened_items)} granular issues...")
+        clusters = self.clustering_engine.cluster_issues(flattened_items)
+        print(f"DEBUG: Discovery phase identified {len(clusters)} distinct failure patterns.")
+        
+        # 4. Generate Suggestions for and each cluster
+        # Note: We'd normally need the 'current_prompt' and tool schemas.
+        current_prompt = "You are a helpful travel assistant. Always use YYYY-MM-DD for dates."
+        
+        # Mock tool definitions for the demo
+        tool_definitions = {
+            "hotel_search": {
+                "name": "hotel_search",
+                "description": "Search for hotels in a city",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {"type": "string", "description": "City name"},
+                        "check_in": {"type": "string", "description": "Check-in date"},
+                        "guests": {"type": "integer"}
+                    }
+                }
+            },
+            "flight_booker": {
+                "name": "flight_booker",
+                "description": "Book a flight manually",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "origin": {"type": "string"},
+                        "destination": {"type": "string"},
+                        "date": {"type": "string"}
+                    }
+                }
+            }
+        }
+        
+        proposals = []
+        for cluster in clusters:
+            print(f"DEBUG: Generating improvement proposal for pattern: '{cluster.label}' (Significance: {cluster.significance_score:.1f})")
+            proposal = self.suggestion_engine.generate_proposal(cluster, current_prompt, tool_definitions)
+            # Persist the proposal
+            self.repository.save_proposal(proposal)
+            proposals.append(proposal)
+            
+        print(f"DEBUG: Analysis cycle complete. Generated {len(proposals)} proposals.")
+        return proposals
+
+    def verify_proposal(self, proposal_id: str) -> RegressionReport:
+        """Run regression tests for a specific proposal."""
+        proposal = self.repository.get_proposal(proposal_id)
+        if not proposal:
+            raise ValueError(f"Proposal not found: {proposal_id}")
+            
+        # 1. Fetch 'Golden Dataset' (for demo: sample 20 random conversations)
+        test_set = self.repository.list_conversations(limit=20)
+        
+        # 2. Run regression
+        print(f"DEBUG: Starting regression verification for proposal {proposal_id} on {len(test_set)} test cases...")
+        report = self.regression_tester.run_regression(proposal, test_set)
+        
+        # 3. Update proposal with report
+        improvement_count = sum(1 for d in report.score_deltas if d.is_improvement)
+        print(f"DEBUG: Regression complete for {proposal_id}. Improvement detected in {improvement_count} metrics.")
+        
+        proposal.regression_report = report
+        from src.analysis.models import ProposalStatus
+        proposal.status = ProposalStatus.TESTING
+        self.repository.save_proposal(proposal)
+        
+        return report

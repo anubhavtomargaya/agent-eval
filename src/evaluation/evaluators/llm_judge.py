@@ -118,15 +118,12 @@ class LLMJudgeEvaluator(Evaluator):
     def _evaluate(self, conversation: Conversation) -> EvaluatorResult:
         """Evaluate conversation using LLM-as-Judge."""
         if self.is_mock:
-            print(f"DEBUG: LLMJudgeEvaluator using MOCK for {conversation.conversation_id}")
             return self._mock_result(conversation.conversation_id)
 
         try:
-            print(f"DEBUG: LLMJudgeEvaluator starting REAL LLM call for {conversation.conversation_id}")
             client = self.factory.get_client()
             conversation_text = _format_conversation(conversation)
             
-            print(f"DEBUG: Calling OpenAI Chat Completions (JSON Mode)...")
             # Call LLM with direct OpenAI client using JSON mode
             response = client.chat.completions.create(
                 model=self.model.value,
@@ -142,7 +139,6 @@ class LLMJudgeEvaluator(Evaluator):
             if not content:
                 raise ValueError("Empty response from LLM")
                 
-            print(f"DEBUG: LLM Response received, parsing with Pydantic...")
             parsed_response = LLMEvaluationResponse.model_validate_json(content)
             
             return self._process_response(parsed_response)
