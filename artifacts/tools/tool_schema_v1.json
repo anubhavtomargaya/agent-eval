@@ -1,0 +1,6 @@
+{
+  "flight_search": {
+    "required_params": ["destination"],
+    "optional_params": ["date", "origin"]
+  }
+}
