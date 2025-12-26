@@ -82,8 +82,25 @@ class ToolCallEvaluator(Evaluator):
         tool_schemas: dict[str, dict[str, Any]] | None = None,
         strict_mode: bool = False,
     ):
-        self.tool_schemas = tool_schemas or DEFAULT_TOOL_SCHEMAS
+        # Allow a demo "active" schema override to showcase self-updating.
+        self.tool_schemas = tool_schemas or self._load_active_schema() or DEFAULT_TOOL_SCHEMAS
         self.strict_mode = strict_mode
+
+    def _load_active_schema(self) -> dict[str, dict[str, Any]] | None:
+        """Load the active tool schema artifact if present."""
+        from pathlib import Path
+        import json
+
+        schema_path = Path("artifacts/tools/active_tool_schema.json")
+        if not schema_path.exists():
+            return None
+        try:
+            data = json.loads(schema_path.read_text())
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, dict):
+            return None
+        return data
     
     @property
     def evaluator_name(self) -> str:
@@ -243,4 +260,3 @@ class ToolCallEvaluator(Evaluator):
                 "execution_failures": execution_failures,
             },
         )
-

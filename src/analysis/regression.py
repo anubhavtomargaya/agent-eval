@@ -1,4 +1,6 @@
 from typing import List, Optional, Any
+import json
+from pathlib import Path
 from src.analysis.models import RegressionReport, ScoreDelta, ImprovementProposal
 from src.models import EvaluationResult, Conversation
 from src.utils.llm import LLMClientFactory
@@ -38,6 +40,71 @@ class RegressionTester:
         
         return report
 
+    def run_real_regression(
+        self,
+        proposal: ImprovementProposal,
+        prompts: list[str],
+        baseline_version: str = "v1",
+    ) -> RegressionReport:
+        """Run a real regression using the demo agent and current active artifacts."""
+        from src.agent.demo_agent import DemoAgent, build_conversation_payload
+        from src.ingestion.service import IngestionService
+        from src.db.repository import get_repository
+
+        repository = get_repository(data_dir="./data")
+        ingestion = IngestionService(repository)
+        agent = DemoAgent()
+
+        report = RegressionReport(
+            test_case_count=len(prompts),
+            details={"proposal_id": proposal.proposal_id, "mode": "real"}
+        )
+
+        def run_batch() -> float:
+            ids = []
+            for prompt in prompts:
+                response = agent.generate(prompt, force_error=False)
+                payload = build_conversation_payload(response, agent.prompt_path)
+                conv = ingestion.ingest_single(payload)
+                ids.append(conv.conversation_id)
+            evals = [self.evaluation_service.evaluate(cid) for cid in ids]
+            return sum(e.aggregate_score for e in evals) / len(evals) if evals else 0.0
+
+        # Baseline run (force prompt v1)
+        active_prompt = Path("artifacts/prompts/active_prompt.txt")
+        original_prompt = active_prompt.read_text() if active_prompt.exists() else None
+        baseline_prompt = Path(f"artifacts/prompts/prompt_{baseline_version}.txt")
+
+        try:
+            if baseline_prompt.exists():
+                active_prompt.parent.mkdir(parents=True, exist_ok=True)
+                active_prompt.write_text(baseline_prompt.read_text())
+                agent.prompt_path = active_prompt
+            base_avg = run_batch()
+
+            # Updated run (use applied proposal in active_prompt.txt)
+            if original_prompt is not None:
+                active_prompt.write_text(original_prompt)
+                agent.prompt_path = active_prompt
+            updated_avg = run_batch()
+        finally:
+            if original_prompt is None:
+                if active_prompt.exists():
+                    active_prompt.unlink()
+            else:
+                active_prompt.write_text(original_prompt)
+
+        report.score_deltas = [
+            ScoreDelta(
+                metric_name="aggregate_score",
+                old_val=round(base_avg, 3),
+                new_val=round(updated_avg, 3),
+                is_improvement=updated_avg > base_avg,
+            )
+        ]
+        report.overall_improvement = updated_avg > base_avg
+        return report
+
     def _simulate_shadow_conversation(self, original: Conversation, proposal: ImprovementProposal) -> Conversation:
         """Simulate a conversation using the new prompt or tool schema.
         
@@ -50,6 +117,10 @@ class RegressionTester:
             shadow_turns.append(turn)
             
         metadata = {**original.metadata, "is_shadow": True, "prompt_version": "proposed"}
+        if proposal.metadata.get("prompt_path"):
+            metadata["prompt_path"] = proposal.metadata["prompt_path"]
+        if proposal.metadata.get("tool_schema_path"):
+            metadata["tool_schema_path"] = proposal.metadata["tool_schema_path"]
         
         # Simulate 'Impact': If this is a tool fix, we mark that the tool calls are now valid
         if proposal.type.value == "tool":

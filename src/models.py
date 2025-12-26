@@ -61,6 +61,20 @@ class IssueType(str, Enum):
 # =============================================================================
 
 @dataclass
+class FeedbackSignal:
+    """Represents a single feedback signal for a conversation or turn."""
+    feedback_type: Literal["explicit", "implicit"] = "explicit"
+    signal: str = ""
+    value: Any = None
+    source: str = ""
+    timestamp: datetime = field(default_factory=datetime.utcnow)
+    turn_id: int | None = None
+    annotator_id: str | None = None
+    confidence: float | None = None
+    notes: str | None = None
+
+
+@dataclass
 class ToolCall:
     """Represents a tool/function call made by the assistant.
     
@@ -113,6 +127,7 @@ class Conversation:
     """
     conversation_id: str
     turns: tuple[Turn, ...] | list[Turn]
+    feedback: tuple[FeedbackSignal, ...] | list[FeedbackSignal] = field(default_factory=tuple)
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.utcnow)
     
@@ -123,6 +138,9 @@ class Conversation:
         # Normalize turns to tuple
         if isinstance(self.turns, list):
             self.turns = tuple(self.turns)
+        # Normalize feedback to tuple
+        if isinstance(self.feedback, list):
+            self.feedback = tuple(self.feedback)
 
 
 # =============================================================================

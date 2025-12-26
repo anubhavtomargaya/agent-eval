@@ -5,7 +5,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.db.repository import get_repository
 from src.evaluation.service import EvaluationService
-from src.evaluation.evaluators import EvaluatorRegistry
+from src.evaluation.evaluators import get_global_registry, EvaluatorDiscovery
 from src.analysis.service import AnalysisService
 
 def main():
@@ -13,7 +13,8 @@ def main():
     
     # 1. Initialize dependencies
     repository = get_repository(data_dir="./data")
-    registry = EvaluatorRegistry()
+    registry = get_global_registry()
+    EvaluatorDiscovery.discover_and_register(registry)
     eval_service = EvaluationService(repository, registry)
     analysis_service = AnalysisService(repository, eval_service)
     

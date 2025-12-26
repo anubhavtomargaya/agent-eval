@@ -23,6 +23,7 @@ from functools import lru_cache
 
 from src.models import (
     Conversation,
+    FeedbackSignal,
     Turn,
     ToolCall,
     Role,
@@ -50,6 +51,21 @@ class ConversationRepository(ABC):
     @abstractmethod
     def list_conversations(self, limit: int = 100, offset: int = 0) -> list[Conversation]:
         """List conversations with pagination."""
+        pass
+
+    @abstractmethod
+    def add_feedback(self, conversation_id: str, feedback: FeedbackSignal) -> None:
+        """Append feedback to a conversation."""
+        pass
+
+    @abstractmethod
+    def flag_for_review(self, conversation_id: str, reason: str | None = None) -> None:
+        """Mark a conversation as needing human review."""
+        pass
+
+    @abstractmethod
+    def list_feedback(self, conversation_id: str) -> list[FeedbackSignal]:
+        """List feedback items for a conversation."""
         pass
     
     @abstractmethod
@@ -231,6 +247,7 @@ class InMemoryRepository(ConversationRepository):
         """Convert Conversation to dictionary for JSON serialization."""
         return {
             "conversation_id": conv.conversation_id,
+            "feedback": [self._feedback_to_dict(f) for f in conv.feedback],
             "metadata": conv.metadata,
             "created_at": conv.created_at.isoformat(),
             "turns": [
@@ -253,7 +270,42 @@ class InMemoryRepository(ConversationRepository):
                 for t in conv.turns
             ],
         }
-    
+
+    def _feedback_to_dict(self, feedback: FeedbackSignal) -> dict[str, Any]:
+        """Convert FeedbackSignal to dictionary for JSON serialization."""
+        return {
+            "feedback_type": feedback.feedback_type,
+            "signal": feedback.signal,
+            "value": feedback.value,
+            "source": feedback.source,
+            "timestamp": feedback.timestamp.isoformat() if feedback.timestamp else None,
+            "turn_id": feedback.turn_id,
+            "annotator_id": feedback.annotator_id,
+            "confidence": feedback.confidence,
+            "notes": feedback.notes,
+        }
+
+    def _dict_to_feedback(self, data: dict[str, Any]) -> FeedbackSignal:
+        """Convert dictionary to FeedbackSignal."""
+        timestamp = None
+        if data.get("timestamp"):
+            try:
+                timestamp = datetime.fromisoformat(data["timestamp"])
+            except (ValueError, TypeError):
+                timestamp = None
+
+        return FeedbackSignal(
+            feedback_type=data.get("feedback_type", "explicit"),
+            signal=data.get("signal", ""),
+            value=data.get("value"),
+            source=data.get("source", ""),
+            timestamp=timestamp or datetime.utcnow(),
+            turn_id=data.get("turn_id"),
+            annotator_id=data.get("annotator_id"),
+            confidence=data.get("confidence"),
+            notes=data.get("notes"),
+        )
+
     def _dict_to_conversation(self, data: dict[str, Any]) -> Conversation:
         """Convert dictionary to Conversation."""
         turns = []
@@ -283,6 +335,11 @@ class InMemoryRepository(ConversationRepository):
                 latency_ms=t.get("latency_ms"),
                 tool_calls=tool_calls,
             ))
+
+        feedback_items = []
+        for item in data.get("feedback", []):
+            if isinstance(item, dict):
+                feedback_items.append(self._dict_to_feedback(item))
         
         created_at = datetime.utcnow()
         if data.get("created_at"):
@@ -294,6 +351,7 @@ class InMemoryRepository(ConversationRepository):
         return Conversation(
             conversation_id=data["conversation_id"],
             turns=tuple(turns),
+            feedback=tuple(feedback_items),
             metadata=data.get("metadata", {}),
             created_at=created_at,
         )
@@ -415,6 +473,33 @@ class InMemoryRepository(ConversationRepository):
         # Sort by created_at descending
         conversations.sort(key=lambda c: c.created_at, reverse=True)
         return conversations[offset:offset + limit]
+
+    def add_feedback(self, conversation_id: str, feedback: FeedbackSignal) -> None:
+        """Append feedback to a conversation."""
+        conversation = self._conversations.get(conversation_id)
+        if conversation is None:
+            return
+        existing = list(conversation.feedback)
+        existing.append(feedback)
+        conversation.feedback = tuple(existing)
+        self._save_to_disk()
+
+    def flag_for_review(self, conversation_id: str, reason: str | None = None) -> None:
+        """Mark a conversation as needing human review."""
+        conversation = self._conversations.get(conversation_id)
+        if conversation is None:
+            return
+        conversation.metadata["needs_review"] = True
+        if reason:
+            conversation.metadata["review_reason"] = reason
+        self._save_to_disk()
+
+    def list_feedback(self, conversation_id: str) -> list[FeedbackSignal]:
+        """List feedback items for a conversation."""
+        conversation = self._conversations.get(conversation_id)
+        if conversation is None:
+            return []
+        return list(conversation.feedback)
     
     def save_evaluation(self, evaluation: EvaluationResult) -> str:
         """Save an evaluation result and return its run_id."""
@@ -475,4 +560,3 @@ def set_repository(repo: ConversationRepository) -> None:
     """Set a custom repository (useful for testing)."""
     global _repository
     _repository = repo
-
