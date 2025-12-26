@@ -517,7 +517,7 @@ def create_app() -> FastAPI:
     @app.get("/feedback/samples", response_model=list[FeedbackSampleResponse], tags=["Feedback"])
     async def sample_conversations_for_feedback(
         limit: int = Query(default=50, le=200),
-        strategy: str = Query(default="evaluation"),
+        strategy: str = Query(default="confidence"),
         min_issues: int = Query(default=1, ge=0),
         max_score: float = Query(default=0.6, ge=0.0, le=1.0),
         threshold: float = Query(default=0.8, ge=0.0, le=1.0),

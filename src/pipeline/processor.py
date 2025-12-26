@@ -75,7 +75,7 @@ class PipelineProcessor:
 
     def flag_for_review(
         self,
-        strategy: str = "evaluation",
+        strategy: str = "confidence",
         limit: int = 50,
         **kwargs: Any,
     ) -> list[str]:

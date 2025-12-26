@@ -201,7 +201,7 @@ def sample_conversations(
     **kwargs: Any,
 ) -> list[ConversationSample]:
     """Dispatch to the selected sampling strategy."""
-    if strategy == "evaluation" and not evaluations:
+    if strategy in ("evaluation", "confidence") and not evaluations:
         strategy = "random"
     
     sampler = _STRATEGIES.get(strategy)

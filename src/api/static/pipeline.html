@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Demo - Agent Evaluation System</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --accent-color: #58a6ff;
+            --success-color: #3fb950;
+            --warning-color: #d29922;
+            --error-color: #f85149;
+            --font-mono: 'Consolas', 'Monaco', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            color: var(--accent-color);
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            color: var(--text-secondary);
+        }
+
+        .run-all-btn {
+            display: block;
+            width: 100%;
+            max-width: 400px;
+            margin: 20px auto;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent-color), var(--success-color));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .run-all-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(88, 166, 255, 0.3);
+        }
+
+        .stage-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stage-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+
+        .stage-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .stage-title span:first-child {
+            font-size: 28px;
+        }
+
+        .run-btn {
+            padding: 10px 20px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .run-btn:hover {
+            background: #4a90e2;
+        }
+
+        .run-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .stage-status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-bottom: 15px;
+        }
+
+        .status-ready {
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--accent-color);
+        }
+
+        .status-loading {
+            background: rgba(210, 153, 34, 0.1);
+            color: var(--warning-color);
+        }
+
+        .status-success {
+            background: rgba(63, 185, 80, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-error {
+            background: rgba(248, 81, 73, 0.1);
+            color: var(--error-color);
+        }
+
+        .stage-input,
+        .stage-output {
+            background: #0d1117;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            margin: 10px 0;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .stage-output {
+            white-space: pre-wrap;
+            color: var(--text-secondary);
+        }
+
+        .stage-output.has-data {
+            color: var(--success-color);
+        }
+
+        .section-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin: 15px 0 5px;
+        }
+
+        .scenario-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent-color);
+            border: 1px solid var(--accent-color);
+            margin-right: 8px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <a href="/">← Back to Dashboard</a>
+
+        <div class="header">
+            <h1>🎯 End-to-End Pipeline Demo</h1>
+            <p class="subtitle">Run each stage with real API calls using sample problematic conversation</p>
+        </div>
+
+        <button class="run-all-btn" onclick="runAllStages()">▶ Run Full Pipeline</button>
+
+        <!-- Stage 1: Ingest -->
+        <div class="stage-card" id="stage-1">
+            <div class="stage-header">
+                <div class="stage-title">
+                    <span>📥</span>
+                    <span>Stage 1: Data Ingestion</span>
+                </div>
+                <button class="run-btn" onclick="runStage1()">Run Stage 1</button>
+            </div>
+            <div class="stage-status status-ready" id="stage-1-status">Ready - Click to ingest sample conversation</div>
+            <div class="section-label">Sample Input (tool_regression_001)</div>
+            <div class="stage-input" id="stage-1-input">Loading sample data...</div>
+            <div class="section-label">API Response</div>
+            <div class="stage-output" id="stage-1-output">Waiting...</div>
+            <div style="margin-top:10px">
+                <span class="scenario-badge">Scenario: Tool Call Regression</span>
+                <span style="color:var(--text-secondary);font-size:12px;">Agent uses wrong date format in tool
+                    parameter</span>
+            </div>
+        </div>
+
+        <!-- Stage 2: Evaluate -->
+        <div class="stage-card" id="stage-2">
+            <div class="stage-header">
+                <div class="stage-title">
+                    <span>🤖</span>
+                    <span>Stage 2: Automated Evaluation</span>
+                </div>
+                <button class="run-btn" onclick="runStage2()">Run Stage 2</button>
+            </div>
+            <div class="stage-status status-ready" id="stage-2-status">Waiting for Stage 1</div>
+            <div class="section-label">Evaluators: Heuristic (~1ms) → Tool Call (~5ms) → Causality (~10ms) → Coherence
+                (~10ms) → LLM Judge (~500ms, routed subset in production)</div>
+            <div class="section-label">Evaluation Result</div>
+            <div class="stage-output" id="stage-2-output">Waiting...</div>
+        </div>
+
+        <!-- Stage 3: Human Review -->
+        <div class="stage-card" id="stage-3">
+            <div class="stage-header">
+                <div class="stage-title">
+                    <span>👤</span>
+                    <span>Stage 3: Human Feedback</span>
+                </div>
+                <button class="run-btn" onclick="runStage3()">Submit Feedback</button>
+            </div>
+            <div class="stage-status status-ready" id="stage-3-status">Waiting for Stage 2</div>
+            <div class="section-label">Simulated Human Review</div>
+            <div class="stage-input">Rating: 2/5 | Annotator: demo_reviewer | Notes: "Tool call error detected - date
+                format issue"</div>
+            <div class="section-label">Feedback Response</div>
+            <div class="stage-output" id="stage-3-output">Waiting...</div>
+        </div>
+
+        <!-- Stage 4: Analysis -->
+        <div class="stage-card" id="stage-4">
+            <div class="stage-header">
+                <div class="stage-title">
+                    <span>🧠</span>
+                    <span>Stage 4: Pattern Analysis</span>
+                </div>
+                <button class="run-btn" onclick="runStage4()">Run Analysis</button>
+            </div>
+            <div class="stage-status status-ready" id="stage-4-status">Waiting for Stage 3</div>
+            <div class="section-label">Process: Cluster failures → Rank by severity → Generate improvement proposals
+            </div>
+            <div class="section-label">Generated Proposals</div>
+            <div class="stage-output" id="stage-4-output">Waiting...</div>
+        </div>
+
+        <!-- Stage 5: Regression Testing -->
+        <div class="stage-card" id="stage-5">
+            <div class="stage-header">
+                <div class="stage-title">
+                    <span>💡</span>
+                    <span>Stage 5: Regression Testing</span>
+                </div>
+                <button class="run-btn" onclick="runStage5()">Verify Proposal</button>
+            </div>
+            <div class="stage-status status-ready" id="stage-5-status">Waiting for Stage 4</div>
+            <div class="section-label">Process: Load golden dataset → Re-evaluate with proposed fix → Compare scores
+            </div>
+            <div class="section-label">Regression Report</div>
+            <div class="stage-output" id="stage-5-output">Waiting...</div>
+        </div>
+
+        <div class="footer">
+            <p><strong>Assignment Goals Demonstrated:</strong></p>
+            <p>✅ Data Ingestion | ✅ Multi-Evaluator Framework | ✅ Feedback Integration | ✅ Self-Updating Mechanism</p>
+        </div>
+    </div>
+
+    <script>
+        // State
+        const state = { conversationId: null, proposals: [] };
+
+        // Sample data - hardcoded from conversations.json
+        const sampleConversation = {
+            "conversation_id": "demo_pipeline_" + Date.now(),
+            "turns": [
+                { "turn_id": 0, "role": "user", "content": "I need a hotel in Paris for Dec 26th." },
+                {
+                    "turn_id": 1, "role": "assistant", "content": "Searching Paris hotels...",
+                    "tool_calls": [{
+                        "tool_name": "hotel_search", "parameters": { "location": "Paris", "check_in": "26/12/2025" },
+                        "result": { "error": "Invalid date format. Expected YYYY-MM-DD" }
+                    }]
+                },
+                { "turn_id": 2, "role": "assistant", "content": "I'm sorry, I'm having trouble with the date format." }
+            ],
+            "metadata": { "user_id": "user_999", "agent_version": "v1.2-beta" }
+        };
+
+        // Display sample data on load
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('stage-1-input').textContent = JSON.stringify(sampleConversation, null, 2);
+        });
+
+        // API helpers
+        async function apiCall(endpoint, method = 'GET', body = null) {
+            const opts = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) opts.body = JSON.stringify(body);
+            const res = await fetch(endpoint, opts);
+            if (!res.ok) throw new Error(await res.text());
+            return res.json();
+        }
+
+        function setStatus(id, type, msg) {
+            const el = document.getElementById(id + '-status');
+            el.className = 'stage-status status-' + type;
+            el.textContent = msg;
+        }
+
+        function setOutput(id, data) {
+            const el = document.getElementById(id + '-output');
+            el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+            el.classList.add('has-data');
+        }
+
+        // Stage 1: Ingest
+        async function runStage1() {
+            setStatus('stage-1', 'loading', 'Ingesting conversation...');
+            try {
+                // API expects { conversations: [...] } wrapper
+                const res = await apiCall('/ingest', 'POST', { conversations: [sampleConversation] });
+                state.conversationId = res.conversation_ids[0];
+                setOutput('stage-1', res);
+                setStatus('stage-1', 'success', `✓ Ingested: ${state.conversationId}`);
+                setStatus('stage-2', 'ready', 'Ready - Click to run evaluation');
+            } catch (e) {
+                setStatus('stage-1', 'error', 'Error: ' + e.message);
+                setOutput('stage-1', e.message);
+            }
+        }
+
+        // Stage 2: Evaluate
+        async function runStage2() {
+            if (!state.conversationId) { alert('Run Stage 1 first'); return; }
+            setStatus('stage-2', 'loading', 'Running 5 evaluators...');
+            try {
+                const res = await apiCall('/evaluate/batch', 'POST', { conversation_ids: [state.conversationId] });
+                const r = res[0];
+                setOutput('stage-2', { conversation_id: r.conversation_id, aggregate_score: r.aggregate_score, issues_count: r.issues_count, issues: r.issues });
+                setStatus('stage-2', 'success', `✓ Score: ${r.aggregate_score.toFixed(2)} | Issues: ${r.issues_count}`);
+                setStatus('stage-3', 'ready', 'Ready - Click to submit human feedback');
+            } catch (e) {
+                setStatus('stage-2', 'error', 'Error: ' + e.message);
+                setOutput('stage-2', e.message);
+            }
+        }
+
+        // Stage 3: Feedback
+        async function runStage3() {
+            if (!state.conversationId) { alert('Run Stages 1 & 2 first'); return; }
+            setStatus('stage-3', 'loading', 'Submitting feedback...');
+            try {
+                const feedback = { signal: 'user_rating', value: 2, source: 'human_reviewer', annotator_id: 'demo_reviewer', confidence: 1.0, notes: 'Tool call error detected - date format issue' };
+                const res = await apiCall(`/conversations/${state.conversationId}/feedback`, 'POST', feedback);
+                setOutput('stage-3', res);
+                setStatus('stage-3', 'success', '✓ Feedback submitted (Rating: 2/5)');
+                setStatus('stage-4', 'ready', 'Ready - Click to run pattern analysis');
+            } catch (e) {
+                setStatus('stage-3', 'error', 'Error: ' + e.message);
+                setOutput('stage-3', e.message);
+            }
+        }
+
+        // Stage 4: Analysis
+        async function runStage4() {
+            setStatus('stage-4', 'loading', 'Analyzing failure patterns...');
+            try {
+                const res = await apiCall('/analysis/run?limit=100', 'POST');
+                state.proposals = res;
+                if (res.length === 0) {
+                    setOutput('stage-4', 'No proposals generated. Need more failure patterns in the system.');
+                    setStatus('stage-4', 'success', '✓ Analysis complete (0 proposals - need more data)');
+                } else {
+                    setOutput('stage-4', res.map(p => ({ type: p.type, pattern: p.failure_pattern, evidence: p.evidence_count, confidence: p.confidence })));
+                    setStatus('stage-4', 'success', `✓ Generated ${res.length} improvement proposal(s)`);
+                    setStatus('stage-5', 'ready', 'Ready - Click to run regression tests');
+                }
+            } catch (e) {
+                setStatus('stage-4', 'error', 'Error: ' + e.message);
+                setOutput('stage-4', e.message);
+            }
+        }
+
+        // Stage 5: Regression
+        async function runStage5() {
+            if (state.proposals.length === 0) { alert('No proposals to verify. Run Stage 4 first.'); return; }
+            setStatus('stage-5', 'loading', 'Running regression tests on golden dataset...');
+            try {
+                const proposalId = state.proposals[0].proposal_id;
+                const res = await apiCall(`/analysis/proposals/${proposalId}/verify`, 'POST');
+                const improvements = res.score_deltas ? res.score_deltas.filter(d => d.is_improvement).length : 0;
+                setOutput('stage-5', { proposal_id: res.proposal_id, test_cases: res.test_cases_count, improvements: improvements, deltas: res.score_deltas });
+                setStatus('stage-5', 'success', `✓ Tested on ${res.test_cases_count} cases | ${improvements} improvements`);
+            } catch (e) {
+                setStatus('stage-5', 'error', 'Error: ' + e.message);
+                setOutput('stage-5', e.message);
+            }
+        }
+
+        // Run all
+        async function runAllStages() {
+            await runStage1(); await new Promise(r => setTimeout(r, 300));
+            await runStage2(); await new Promise(r => setTimeout(r, 300));
+            await runStage3(); await new Promise(r => setTimeout(r, 300));
+            await runStage4(); await new Promise(r => setTimeout(r, 300));
+            if (state.proposals.length > 0) await runStage5();
+        }
+    </script>
+</body>
+
+</html>
