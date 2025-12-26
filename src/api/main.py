@@ -17,6 +17,7 @@ Endpoints:
 from datetime import datetime
 from typing import Any
 from pathlib import Path
+import json
 import tempfile
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Query
@@ -28,6 +29,9 @@ from src.db.repository import get_repository
 from src.ingestion.service import IngestionService, ValidationError
 from src.evaluation.service import EvaluationService, EvaluationError
 from src.evaluation.evaluators import get_global_registry, EvaluatorDiscovery
+from src.feedback.sampling import sample_conversations, list_strategies, ConversationSample
+from src.agent.demo_agent import DemoAgent, build_conversation_payload, append_turns_payload
+from src.models import FeedbackSignal
 
 
 # =============================================================================
@@ -115,6 +119,80 @@ class ConversationResponse(BaseModel):
     metadata: dict[str, Any]
     created_at: str
     has_evaluation: bool
+
+
+class FeedbackInput(BaseModel):
+    """Input schema for explicit feedback."""
+    signal: str
+    value: Any
+    source: str
+    timestamp: str | None = None
+    turn_id: int | None = None
+    annotator_id: str | None = None
+    confidence: float | None = None
+    notes: str | None = None
+
+
+class FeedbackItemResponse(BaseModel):
+    """Single feedback item response."""
+    conversation_id: str
+    feedback_type: str
+    signal: str
+    value: Any
+    source: str
+    timestamp: str
+    turn_id: int | None = None
+    annotator_id: str | None = None
+    confidence: float | None = None
+    notes: str | None = None
+
+
+class FeedbackSampleResponse(BaseModel):
+    """Response for feedback sampling."""
+    conversation_id: str
+    aggregate_score: float | None = None
+    issues_count: int | None = None
+    turn_count: int
+    created_at: str
+    metadata: dict[str, Any]
+    has_evaluation: bool
+
+
+class FeedbackAgreementResponse(BaseModel):
+    """Response for feedback agreement metrics."""
+    signal: str
+    items: int
+    annotators: int
+    pairwise_kappa: float | None = None
+    krippendorff_alpha: float | None = None
+
+
+class DemoAskInput(BaseModel):
+    """Input schema for demo agent requests."""
+    message: str
+    force_error: bool = False
+
+
+class DemoAskResponse(BaseModel):
+    """Response for demo agent requests."""
+    conversation_id: str
+    assistant_message: str
+    tool_name: str | None = None
+    tool_params: dict[str, Any] | None = None
+
+
+class DemoTurnInput(BaseModel):
+    """Input schema for adding a turn to an existing conversation."""
+    conversation_id: str
+    message: str
+    force_error: bool = False
+
+
+class DemoTurnResponse(BaseModel):
+    """Response for demo turn requests."""
+    conversation_id: str
+    turn_count: int
+    last_turn_id: int
 
 
 class StatsResponse(BaseModel):
@@ -371,6 +449,17 @@ def create_app() -> FastAPI:
             "conversation_id": conv.conversation_id,
             "metadata": conv.metadata,
             "created_at": conv.created_at.isoformat(),
+            "feedback": [
+                {
+                    "signal": f.signal,
+                    "value": f.value,
+                    "source": f.source,
+                    "notes": f.notes,
+                    "timestamp": f.timestamp.isoformat() if f.timestamp else None,
+                    "annotator_id": f.annotator_id,
+                }
+                for f in conv.feedback
+            ],
             "turns": [
                 {
                     "turn_id": t.turn_id,
@@ -390,6 +479,75 @@ def create_app() -> FastAPI:
                 for t in conv.turns
             ],
         }
+
+    # =========================================================================
+    # Feedback Endpoints
+    # =========================================================================
+
+    @app.post("/conversations/{conversation_id}/feedback", response_model=FeedbackItemResponse, tags=["Feedback"])
+    async def add_feedback(conversation_id: str, feedback: FeedbackInput):
+        """Add explicit feedback for a conversation."""
+        conv = repository.get_conversation(conversation_id)
+        if conv is None:
+            raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
+
+        feedback_item = FeedbackSignal(
+            feedback_type="explicit",
+            signal=feedback.signal,
+            value=feedback.value,
+            source=feedback.source,
+            timestamp=_parse_timestamp(feedback.timestamp),
+            turn_id=feedback.turn_id,
+            annotator_id=feedback.annotator_id,
+            confidence=feedback.confidence,
+            notes=feedback.notes,
+        )
+        repository.add_feedback(conversation_id, feedback_item)
+        return _feedback_to_response(conversation_id, feedback_item)
+
+    @app.get("/conversations/{conversation_id}/feedback", response_model=list[FeedbackItemResponse], tags=["Feedback"])
+    async def list_feedback(conversation_id: str):
+        """List all feedback items for a conversation."""
+        conv = repository.get_conversation(conversation_id)
+        if conv is None:
+            raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
+        items = repository.list_feedback(conversation_id)
+        return [_feedback_to_response(conversation_id, item) for item in items]
+
+    @app.get("/feedback/samples", response_model=list[FeedbackSampleResponse], tags=["Feedback"])
+    async def sample_conversations_for_feedback(
+        limit: int = Query(default=50, le=200),
+        strategy: str = Query(default="evaluation"),
+        min_issues: int = Query(default=1, ge=0),
+        max_score: float = Query(default=0.6, ge=0.0, le=1.0),
+        threshold: float = Query(default=0.8, ge=0.0, le=1.0),
+        metadata_key: str | None = Query(default=None),
+        metadata_value: str | None = Query(default=None),
+        seed: int | None = Query(default=None),
+    ):
+        """Sample conversations for human feedback review."""
+        evaluations = evaluation_service.list_evaluations(limit=1000, offset=0)
+        conversations = repository.list_conversations(limit=10000, offset=0)
+        try:
+            samples = sample_conversations(
+                strategy=strategy,
+                conversations=conversations,
+                evaluations=evaluations,
+                limit=limit,
+                min_issues=min_issues,
+                max_score=max_score,
+                threshold=threshold,
+                metadata_key=metadata_key,
+                metadata_value=metadata_value,
+                seed=seed,
+            )
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{str(e)}. Available strategies: {', '.join(list_strategies())}",
+            )
+
+        return [_sample_to_response(sample) for sample in samples]
     
     # =========================================================================
     # Statistics Endpoints
@@ -450,6 +608,150 @@ def create_app() -> FastAPI:
         except Exception as e:
             raise HTTPException(status_code=500, detail=str(e))
 
+    @app.post("/analysis/proposals/{proposal_id}/apply", tags=["Analysis"])
+    async def apply_proposal(proposal_id: str):
+        """Apply a proposal by writing it to the active artifact files."""
+        try:
+            artifacts = analysis_service.apply_proposal(proposal_id)
+            return {"status": "applied", "artifacts": artifacts}
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    @app.post("/analysis/proposals/{proposal_id}/verify-real", response_model=RegressionReportResponse, tags=["Analysis"])
+    async def verify_proposal_real(proposal_id: str):
+        """Run a real regression using the demo agent and fixed prompt set."""
+        try:
+            prompts_path = Path("data/regression_prompts.json")
+            if not prompts_path.exists():
+                raise HTTPException(status_code=404, detail="regression_prompts.json not found")
+            prompts = json.loads(prompts_path.read_text())
+            report = analysis_service.run_real_regression(proposal_id, prompts)
+            return _report_to_response(report)
+        except HTTPException:
+            raise
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # =========================================================================
+    # Demo Agent Endpoints
+    # =========================================================================
+
+    @app.post("/demo/ask", response_model=DemoAskResponse, tags=["Demo"])
+    async def demo_ask(input_data: DemoAskInput):
+        """Generate and ingest a demo conversation using the current prompt."""
+        agent = DemoAgent()
+        response = agent.generate(
+            input_data.message,
+            force_error=input_data.force_error,
+        )
+        payload = build_conversation_payload(response, agent.prompt_path)
+        conversation = ingestion_service.ingest_single(payload)
+
+        return DemoAskResponse(
+            conversation_id=conversation.conversation_id,
+            assistant_message=response.assistant_message,
+            tool_name=response.tool_call["tool_name"] if response.tool_call else None,
+            tool_params=response.tool_call["parameters"] if response.tool_call else None,
+        )
+
+    @app.post("/demo/turn", response_model=DemoTurnResponse, tags=["Demo"])
+    async def demo_turn(input_data: DemoTurnInput):
+        """Append a user/assistant turn pair to an existing conversation."""
+        conv = repository.get_conversation(input_data.conversation_id)
+        if conv is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+
+        agent = DemoAgent()
+        assistant_message, tool_call = agent.generate_turn(
+            input_data.message,
+            force_error=input_data.force_error,
+        )
+
+        existing_payload = {
+            "conversation_id": conv.conversation_id,
+            "turns": [
+                {
+                    "turn_id": t.turn_id,
+                    "role": t.role.value,
+                    "content": t.content,
+                    "timestamp": t.timestamp.isoformat() if t.timestamp else None,
+                    "latency_ms": t.latency_ms,
+                    "tool_calls": [
+                        {
+                            "tool_name": tc.tool_name,
+                            "parameters": tc.parameters,
+                            "result": tc.result,
+                            "execution_time_ms": tc.execution_time_ms,
+                        }
+                        for tc in t.tool_calls
+                    ],
+                }
+                for t in conv.turns
+            ],
+            "metadata": conv.metadata,
+        }
+
+        payload = append_turns_payload(
+            existing_payload,
+            user_message=input_data.message,
+            assistant_message=assistant_message,
+            tool_call=tool_call,
+            prompt_path=agent.prompt_path,
+        )
+        updated = ingestion_service.ingest_single(payload)
+
+        return DemoTurnResponse(
+            conversation_id=updated.conversation_id,
+            turn_count=len(updated.turns),
+            last_turn_id=updated.turns[-1].turn_id if updated.turns else 0,
+        )
+
+    # =========================================================================
+    # Feedback & Meta-Evaluation Endpoints (NEW)
+    # =========================================================================
+
+    from src.feedback.service import FeedbackService
+
+    feedback_service = FeedbackService(repository)
+
+    @app.get("/feedback/disagreements", tags=["Feedback"])
+    async def get_feedback_disagreements(limit: int = 50):
+        """List conversations where human annotators disagree."""
+        return feedback_service.get_disagreements(limit=limit)
+
+    @app.get("/feedback/metrics", response_model=FeedbackAgreementResponse, tags=["Feedback"])
+    async def get_feedback_metrics(signal: str = Query(...)):
+        """Compute agreement metrics for a feedback signal."""
+        return feedback_service.get_agreement_metrics(signal)
+
+    @app.post("/feedback/resolve", tags=["Feedback"])
+    async def resolve_disagreement(
+        conversation_id: str, 
+        signal: str, 
+        value: Any, 
+        resolver_id: str = "admin"
+    ):
+        """Manually resolve a disagreement."""
+        feedback_service.resolve_disagreement(conversation_id, signal, value, resolver_id)
+        return {"status": "resolved"}
+
+    # =========================================================================
+    # Static Files (Frontend)
+    # =========================================================================
+    
+    from fastapi.staticfiles import StaticFiles
+    import os
+    
+    # Ensure static directory exists
+    static_dir = Path(__file__).parent / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    
+    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+
     return app
 
 
@@ -492,6 +794,45 @@ def _evaluation_to_response(result) -> EvaluationResponse:
             for i in result.issues
         ],
         issues_count=len(result.issues),
+    )
+
+
+def _parse_timestamp(value: str | None) -> datetime:
+    """Parse an ISO timestamp, defaulting to now."""
+    if not value:
+        return datetime.utcnow()
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.utcnow()
+
+
+def _feedback_to_response(conversation_id: str, feedback: FeedbackSignal) -> FeedbackItemResponse:
+    """Convert FeedbackSignal to API response model."""
+    return FeedbackItemResponse(
+        conversation_id=conversation_id,
+        feedback_type=feedback.feedback_type,
+        signal=feedback.signal,
+        value=feedback.value,
+        source=feedback.source,
+        timestamp=feedback.timestamp.isoformat() if feedback.timestamp else "",
+        turn_id=feedback.turn_id,
+        annotator_id=feedback.annotator_id,
+        confidence=feedback.confidence,
+        notes=feedback.notes,
+    )
+
+
+def _sample_to_response(sample: ConversationSample) -> FeedbackSampleResponse:
+    """Convert ConversationSample to API response model."""
+    return FeedbackSampleResponse(
+        conversation_id=sample.conversation_id,
+        aggregate_score=sample.aggregate_score,
+        issues_count=sample.issues_count,
+        turn_count=sample.turn_count,
+        created_at=sample.created_at.isoformat(),
+        metadata=sample.metadata,
+        has_evaluation=sample.aggregate_score is not None,
     )
 
 
@@ -539,4 +880,3 @@ if __name__ == "__main__":
     import uvicorn
     settings = get_settings()
     uvicorn.run(app, host=settings.api_host, port=settings.api_port)
-
