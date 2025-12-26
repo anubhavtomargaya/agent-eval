@@ -101,7 +101,7 @@ class EvaluationService:
     def evaluate_pending(self, force: bool = False) -> List[EvaluationResult]:
         """Evaluate all conversations that require processing."""
         if force:
-            pending_ids = [c.conversation_id for c in self.repository.list_conversations(limit=1000)]
+            pending_ids = [c.conversation_id for c in self.repository.list_conversations(limit=100)]
         else:
             pending_ids = self.repository.get_pending_conversations()
             
