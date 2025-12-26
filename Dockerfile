@@ -21,6 +21,7 @@ RUN poetry install --only main --no-root
 # Copy application code
 COPY src /app/src
 COPY artifacts /app/artifacts
+COPY data /app/data
 
 EXPOSE 8000
 
