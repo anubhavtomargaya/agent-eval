@@ -1,0 +1,69 @@
+{
+  "conversation_id": "travel_v1_good_003",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "Find me a hotel in Barcelona with pool and spa, 4-star rating, near the beach, for 2 nights from February 10th, budget $200-300 per night.",
+      "timestamp": "2024-01-26T12:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "I'll find a 4-star hotel in Barcelona near the beach with pool and spa facilities, within your $200-300 budget for 2 nights starting February 10th.",
+      "timestamp": "2024-01-26T12:00:02Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "Searching for hotels in Barcelona...",
+      "tool_calls": [
+        {
+          "tool_name": "hotel_search",
+          "parameters": {
+            "location": "Barcelona",
+            "area": "beach",
+            "check_in": "2024-02-10",
+            "nights": 2,
+            "min_price": 200,
+            "max_price": 300,
+            "min_rating": 4.0,
+            "amenities": ["pool", "spa"]
+          },
+          "result": {
+            "status": "success",
+            "hotels": [
+              {
+                "name": "Beach Spa Resort Barcelona",
+                "price": 250,
+                "rating": 4.2,
+                "amenities": ["pool", "spa", "beachfront"],
+                "distance_to_beach": "50m"
+              },
+              {
+                "name": "Catalan Wellness Hotel",
+                "price": 275,
+                "rating": 4.5,
+                "amenities": ["pool", "spa", "fitness_center"],
+                "distance_to_beach": "200m"
+              }
+            ]
+          }
+        }
+      ],
+      "timestamp": "2024-01-26T12:00:05Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "Perfect! I found two excellent 4-star hotels in Barcelona that match your preferences:\n\n🏖️ **Beach Spa Resort Barcelona** - $250/night\n   • 4.2 stars, beachfront location (50m from beach)\n   • Pool, spa, and wellness facilities\n   • Perfect for your relaxation needs\n\n🏊 **Catalan Wellness Hotel** - $275/night\n   • 4.5 stars, close to beach (200m)\n   • Pool, spa, and fitness center\n   • Higher rating with additional amenities\n\nBoth are within your budget and include the pool and spa facilities you requested. Which would you prefer, or would you like more details about either option?",
+      "timestamp": "2024-01-26T12:00:07Z"
+    }
+  ],
+  "metadata": {
+    "agent_version": "travel_assistant_v1",
+    "prompt_version": "prompt_v1",
+    "scenario": "hotel_booking",
+    "quality_expectation": "good"
+  }
+}

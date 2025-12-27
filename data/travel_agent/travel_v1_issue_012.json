@@ -1,0 +1,49 @@
+{
+  "conversation_id": "travel_v1_issue_012",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "I want to book a direct flight from Los Angeles to London in first class, departing in the evening, with lie-flat seats. My budget is up to $5000.",
+      "timestamp": "2024-01-26T11:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "I'll search for flights to London.",
+      "timestamp": "2024-01-26T11:00:02Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "Flight search completed.",
+      "tool_calls": [
+        {
+          "tool_name": "flight_search",
+          "parameters": {
+            "destination": "London"
+          },
+          "result": {
+            "status": "success",
+            "flights": ["BA005", "VS007", "AA009"],
+            "prices": [4500, 4800, 4200]
+          }
+        }
+      ],
+      "timestamp": "2024-01-26T11:00:05Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "Options available from $4200 to $4800.",
+      "timestamp": "2024-01-26T11:00:07Z"
+    }
+  ],
+  "metadata": {
+    "agent_version": "travel_assistant_v1",
+    "prompt_version": "prompt_v1",
+    "scenario": "flight_booking",
+    "quality_expectation": "issue",
+    "issue_type": "missing_preferences_incomplete"
+  }
+}

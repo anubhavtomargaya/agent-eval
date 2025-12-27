@@ -1,0 +1,53 @@
+{
+  "conversation_id": "travel_v1_issue_002",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "I need a hotel in Rome for 2 nights starting tomorrow.",
+      "timestamp": "2024-01-25T13:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "I'll find hotels in Rome for you.",
+      "timestamp": "2024-01-25T13:00:02Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "Hotel search completed.",
+      "tool_calls": [
+        {
+          "tool_name": "hotel_search",
+          "parameters": {
+            "location": "Rome",
+            "check_in": "2024-01-26",
+            "nights": 2
+          },
+          "result": {
+            "status": "success",
+            "hotels": [
+              {"name": "Hotel Roma", "price": 150},
+              {"name": "Colosseum Hotel", "price": 200}
+            ]
+          }
+        }
+      ],
+      "timestamp": "2024-01-25T13:00:05Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "Found some hotels. Hotel Roma $150/night, Colosseum Hotel $200/night.",
+      "timestamp": "2024-01-25T13:00:07Z"
+    }
+  ],
+  "metadata": {
+    "agent_version": "travel_assistant_v1",
+    "prompt_version": "prompt_v1",
+    "scenario": "hotel_booking",
+    "quality_expectation": "issue",
+    "issue_type": "no_confirmation"
+  }
+}

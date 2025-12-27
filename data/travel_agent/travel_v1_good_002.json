@@ -1,0 +1,67 @@
+{
+  "conversation_id": "travel_v1_good_002",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "Find me a hotel in Paris for 3 nights starting tomorrow.",
+      "timestamp": "2024-01-25T11:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "I'll search for hotels in Paris for 3 nights starting tomorrow. What's your budget and preferred area?",
+      "timestamp": "2024-01-25T11:00:02Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "user",
+      "content": "Around $200-300 per night, near the Eiffel Tower.",
+      "timestamp": "2024-01-25T11:01:00Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "Searching for hotels near Eiffel Tower in Paris from 2024-01-26 to 2024-01-29, $200-300 per night...",
+      "timestamp": "2024-01-25T11:01:02Z"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "Hotel search completed.",
+      "tool_calls": [
+        {
+          "tool_name": "hotel_search",
+          "parameters": {
+            "location": "Paris",
+            "area": "Eiffel Tower",
+            "check_in": "2024-01-26",
+            "check_out": "2024-01-29",
+            "min_price": 200,
+            "max_price": 300
+          },
+          "result": {
+            "status": "success",
+            "hotels": [
+              {"name": "Hotel Eiffel Trocadero", "price": 250, "rating": 4.2},
+              {"name": "Hotel de la Paix", "price": 280, "rating": 4.5}
+            ]
+          }
+        }
+      ],
+      "timestamp": "2024-01-25T11:01:05Z"
+    },
+    {
+      "turn_id": 6,
+      "role": "assistant",
+      "content": "Found two excellent options: Hotel Eiffel Trocadero at $250/night (4.2 stars) and Hotel de la Paix at $280/night (4.5 stars). Both are conveniently located near the Eiffel Tower. Would you like to book one?",
+      "timestamp": "2024-01-25T11:01:07Z"
+    }
+  ],
+  "metadata": {
+    "agent_version": "travel_assistant_v1",
+    "prompt_version": "prompt_v1",
+    "scenario": "hotel_booking",
+    "quality_expectation": "good"
+  }
+}

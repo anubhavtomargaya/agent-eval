@@ -1,0 +1,63 @@
+{
+  "conversation_id": "travel_v1_good_001",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "I need to book a flight to Tokyo for next week.",
+      "timestamp": "2024-01-25T10:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "I'll help you find flights to Tokyo. What date would you like to travel and from which city?",
+      "timestamp": "2024-01-25T10:00:02Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "user",
+      "content": "From New York, departing January 30th, economy class.",
+      "timestamp": "2024-01-25T10:01:00Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "Searching for economy flights from New York to Tokyo on 2024-01-30...",
+      "timestamp": "2024-01-25T10:01:02Z"
+    },
+    {
+      "turn_id": 5,
+      "role": "assistant",
+      "content": "Flight search completed.",
+      "tool_calls": [
+        {
+          "tool_name": "flight_search",
+          "parameters": {
+            "origin": "New York",
+            "destination": "Tokyo",
+            "date": "2024-01-30",
+            "class": "economy"
+          },
+          "result": {
+            "status": "success",
+            "flights": ["JL123", "AA456", "UA789"],
+            "prices": [850, 920, 890]
+          }
+        }
+      ],
+      "timestamp": "2024-01-25T10:01:05Z"
+    },
+    {
+      "turn_id": 6,
+      "role": "assistant",
+      "content": "I found three options: Japan Airlines JL123 for $850, American Airlines AA456 for $920, and United UA789 for $890. All depart in the morning. Which would you prefer?",
+      "timestamp": "2024-01-25T10:01:07Z"
+    }
+  ],
+  "metadata": {
+    "agent_version": "travel_assistant_v1",
+    "prompt_version": "prompt_v1",
+    "scenario": "flight_booking",
+    "quality_expectation": "good"
+  }
+}

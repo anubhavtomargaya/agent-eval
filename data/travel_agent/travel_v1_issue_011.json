@@ -1,0 +1,54 @@
+{
+  "conversation_id": "travel_v1_issue_011",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "Find me a 4-star hotel in Tokyo near Shibuya with spa facilities, budget around $250 per night for 3 nights starting next week.",
+      "timestamp": "2024-01-26T10:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "I'll find hotels in Tokyo.",
+      "timestamp": "2024-01-26T10:00:02Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "Hotel search completed.",
+      "tool_calls": [
+        {
+          "tool_name": "hotel_search",
+          "parameters": {
+            "location": "Tokyo",
+            "check_in": "2024-02-01",
+            "nights": 3
+          },
+          "result": {
+            "status": "success",
+            "hotels": [
+              {"name": "Shibuya Hotel A", "price": 200},
+              {"name": "Tokyo Spa Hotel", "price": 280},
+              {"name": "Shinjuku Grand", "price": 320}
+            ]
+          }
+        }
+      ],
+      "timestamp": "2024-01-26T10:00:05Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "Found hotels: Shibuya Hotel A ($200), Tokyo Spa Hotel ($280), Shinjuku Grand ($320).",
+      "timestamp": "2024-01-26T10:00:07Z"
+    }
+  ],
+  "metadata": {
+    "agent_version": "travel_assistant_v1",
+    "prompt_version": "prompt_v1",
+    "scenario": "hotel_booking",
+    "quality_expectation": "issue",
+    "issue_type": "missing_preferences_incomplete"
+  }
+}
