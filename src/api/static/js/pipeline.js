@@ -65,6 +65,7 @@ async function setActiveConversation(id, openModal) {
         if (openModal) {
             renderConversationModal(conv);
             document.getElementById('conv-modal').classList.add('active');
+            setBodyModalOpen(true);
         }
     } catch (e) {
         console.error('Failed to load conversation:', e);
@@ -398,10 +399,12 @@ async function stage5() {
 
 function showDocsModal() {
     document.getElementById('docs-modal').classList.add('active');
+    setBodyModalOpen(true);
 }
 
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
+    setBodyModalOpen(false);
 }
 
 function showRawModal(stageNumber) {
@@ -409,6 +412,18 @@ function showRawModal(stageNumber) {
     document.getElementById('raw-modal-title').textContent = `Raw Output: Stage ${stageNumber}`;
     document.getElementById('raw-modal-body').textContent = value ? JSON.stringify(value, null, 2) : 'No output yet.';
     document.getElementById('raw-modal').classList.add('active');
+    setBodyModalOpen(true);
+}
+
+function setBodyModalOpen(forceOpen) {
+    if (forceOpen) {
+        document.body.classList.add('modal-open');
+        return;
+    }
+    const anyOpen = document.querySelector('.modal-overlay.active') !== null;
+    if (!anyOpen) {
+        document.body.classList.remove('modal-open');
+    }
 }
 
 function renderConversationModal(conv) {
@@ -432,6 +447,7 @@ function renderConversationModal(conv) {
 document.addEventListener('click', e => {
     if (e.target.classList.contains('modal-overlay')) {
         e.target.classList.remove('active');
+        setBodyModalOpen(false);
     }
 });
 

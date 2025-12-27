@@ -86,6 +86,7 @@ async function showConversation(id) {
         `).join('');
 
         document.getElementById('conv-modal').classList.add('active');
+        document.body.classList.add('modal-open');
     } catch (e) {
         console.error('Failed to load conversation:', e);
     }
@@ -93,16 +94,23 @@ async function showConversation(id) {
 
 function showDocsModal() {
     document.getElementById('docs-modal').classList.add('active');
+    document.body.classList.add('modal-open');
 }
 
 function closeModal(id) {
     document.getElementById(id).classList.remove('active');
+    if (document.querySelector('.modal-overlay.active') === null) {
+        document.body.classList.remove('modal-open');
+    }
 }
 
 // Close modal on overlay click
 document.addEventListener('click', e => {
     if (e.target.classList.contains('modal-overlay')) {
         e.target.classList.remove('active');
+        if (document.querySelector('.modal-overlay.active') === null) {
+            document.body.classList.remove('modal-open');
+        }
     }
 });
 

@@ -405,6 +405,8 @@
             max-height: 80vh;
             overflow: hidden;
             border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
         }
 
         .modal-header {
@@ -432,6 +434,8 @@
             overflow-y: auto;
             font-size: 13px;
             line-height: 1.6;
+            flex: 1;
+            min-height: 0;
         }
 
         .modal-pre {
@@ -487,6 +491,44 @@
             font-weight: 500;
         }
 
+        .conv-tool pre {
+            overflow-x: auto;
+            margin-top: 6px;
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        /* Top tabs */
+        .page-tabs {
+            display: flex;
+            gap: 6px;
+            background: rgba(99, 102, 241, 0.10);
+            border: 1px solid rgba(99, 102, 241, 0.20);
+            padding: 4px;
+            border-radius: 10px;
+        }
+
+        .page-tab {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            text-decoration: none;
+            padding: 6px 10px;
+            border-radius: 8px;
+        }
+
+        .page-tab:hover {
+            color: var(--text);
+        }
+
+        .page-tab.active {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
         /* Spinner */
         @keyframes spin {
             to {
@@ -521,7 +563,13 @@
             <div class="header">
                 <div class="header-top">
                     <h1>🎯 Pipeline Demo</h1>
-                    <button class="info-btn" onclick="showDocsModal()">i</button>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <nav class="page-tabs" aria-label="Pages">
+                            <a class="page-tab active" href="/pipeline.html">Pipeline</a>
+                            <a class="page-tab" href="/pipeline_batch.html">Batch</a>
+                        </nav>
+                        <button class="info-btn" onclick="showDocsModal()">i</button>
+                    </div>
                 </div>
                 <p>Pick a conversation from <code style="color:var(--text)">data/unprocessed</code> and run the full pipeline.</p>
             </div>
