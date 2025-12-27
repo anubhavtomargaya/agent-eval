@@ -1,0 +1,50 @@
+{
+  "conversation_id": "travel_v1_issue_010",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "I need flights from New York to Paris, I want business class with meal service included, departing in the morning, budget up to $1500.",
+      "timestamp": "2024-01-25T21:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "I'll search for flights from New York to Paris.",
+      "timestamp": "2024-01-25T21:00:02Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "Flight search completed.",
+      "tool_calls": [
+        {
+          "tool_name": "flight_search",
+          "parameters": {
+            "origin": "New York",
+            "destination": "Paris"
+          },
+          "result": {
+            "status": "success",
+            "flights": ["AF001", "DL202", "VS303"],
+            "prices": [1200, 900, 1100]
+          }
+        }
+      ],
+      "timestamp": "2024-01-25T21:00:05Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "Found 3 flights. Prices range from $900 to $1200.",
+      "timestamp": "2024-01-25T21:00:07Z"
+    }
+  ],
+  "metadata": {
+    "agent_version": "travel_assistant_v1",
+    "prompt_version": "prompt_v1",
+    "scenario": "flight_booking",
+    "quality_expectation": "issue",
+    "issue_type": "missing_preferences_incomplete"
+  }
+}

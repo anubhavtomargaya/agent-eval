@@ -1,0 +1,48 @@
+{
+  "conversation_id": "travel_v1_issue_003",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "Find flights to Sydney from Los Angeles for next Tuesday.",
+      "timestamp": "2024-01-25T14:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "Searching for flights to Sydney.",
+      "timestamp": "2024-01-25T14:00:02Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "Flight search completed.",
+      "tool_calls": [
+        {
+          "tool_name": "flight_search",
+          "parameters": {
+            "destination": "Sydney"
+          },
+          "result": {
+            "status": "error",
+            "error": "Missing required parameter: origin"
+          }
+        }
+      ],
+      "timestamp": "2024-01-25T14:00:05Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "There was a problem with the search parameters.",
+      "timestamp": "2024-01-25T14:00:07Z"
+    }
+  ],
+  "metadata": {
+    "agent_version": "travel_assistant_v1",
+    "prompt_version": "prompt_v1",
+    "scenario": "flight_booking",
+    "quality_expectation": "issue",
+    "issue_type": "missing_parameters"
+  }
+}

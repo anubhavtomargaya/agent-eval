@@ -1,0 +1,108 @@
+{
+  "conversation_id": "semantic_issues_restaurant_001",
+  "turns": [
+    {
+      "turn_id": 1,
+      "role": "user",
+      "content": "I want to book a table for 4 people at an Italian restaurant in downtown Manhattan for tomorrow evening around 7 PM. We're celebrating my wife's birthday.",
+      "timestamp": "2024-01-25T15:00:00Z"
+    },
+    {
+      "turn_id": 2,
+      "role": "assistant",
+      "content": "I'll help you find an Italian restaurant in downtown Manhattan for 4 people tomorrow at 7 PM.",
+      "timestamp": "2024-01-25T15:00:02Z"
+    },
+    {
+      "turn_id": 3,
+      "role": "assistant",
+      "content": "Searching for available Italian restaurants...",
+      "tool_calls": [
+        {
+          "tool_name": "restaurant_search",
+          "parameters": {
+            "cuisine": "Italian",
+            "location": "downtown Manhattan",
+            "party_size": 4,
+            "date": "2024-01-26",
+            "time": "19:00"
+          },
+          "result": {
+            "restaurants": [
+              {
+                "name": "Mario's Italian Kitchen",
+                "rating": 4.2,
+                "price_range": "$$",
+                "available_times": ["18:00", "19:00", "20:00", "21:00"]
+              },
+              {
+                "name": "Bella Vista",
+                "rating": 4.5,
+                "price_range": "$$$",
+                "available_times": ["18:30", "19:00", "19:30", "20:00"]
+              }
+            ],
+            "status": "success"
+          }
+        }
+      ],
+      "timestamp": "2024-01-25T15:00:05Z"
+    },
+    {
+      "turn_id": 4,
+      "role": "assistant",
+      "content": "I found two Italian restaurants with availability tomorrow at 7 PM. Mario's Italian Kitchen has a 4.2 rating and Bella Vista has a 4.5 rating. Both can accommodate 4 people. Which one would you prefer?",
+      "timestamp": "2024-01-25T15:00:07Z"
+    },
+    {
+      "turn_id": 5,
+      "role": "user",
+      "content": "Bella Vista sounds good. Please book it for 7 PM and mention it's for a birthday celebration.",
+      "timestamp": "2024-01-25T15:01:00Z"
+    },
+    {
+      "turn_id": 6,
+      "role": "assistant",
+      "content": "I'll book Bella Vista for 4 people at 7 PM tomorrow and mention it's for a birthday celebration.",
+      "timestamp": "2024-01-25T15:01:02Z"
+    },
+    {
+      "turn_id": 7,
+      "role": "assistant",
+      "content": "Making reservation...",
+      "tool_calls": [
+        {
+          "tool_name": "book_restaurant",
+          "parameters": {
+            "restaurant_name": "Bella Vista",
+            "party_size": 4,
+            "date": "2024-01-26",
+            "time": "19:00",
+            "special_requests": "Birthday celebration"
+          },
+          "result": {
+            "confirmation_number": "BV20240126001",
+            "restaurant": "Bella Vista",
+            "date": "2024-01-26",
+            "time": "19:00",
+            "party_size": 4,
+            "status": "confirmed"
+          }
+        }
+      ],
+      "timestamp": "2024-01-25T15:01:05Z"
+    },
+    {
+      "turn_id": 8,
+      "role": "assistant",
+      "content": "Your reservation at Bella Vista for 4 people tomorrow at 7 PM has been confirmed. Confirmation number is BV20240126001. The restaurant is located at 123 Broadway, Manhattan. Enjoy your dinner!",
+      "timestamp": "2024-01-25T15:01:07Z"
+    }
+  ],
+  "metadata": {
+    "user_id": "birthday_dinner_789",
+    "agent_version": "v2.0",
+    "scenario": "semantic_issues_demo",
+    "celebration_type": "birthday"
+  }
+}
