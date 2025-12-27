@@ -33,6 +33,8 @@ from src.feedback.sampling import sample_conversations, list_strategies, Convers
 from src.agent.demo_agent import DemoAgent, build_conversation_payload, append_turns_payload
 from src.models import FeedbackSignal
 
+BASE_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = BASE_DIR / "data"
 
 # =============================================================================
 # Pydantic Models for API
@@ -275,7 +277,7 @@ def create_app() -> FastAPI:
     registry = get_global_registry()
     EvaluatorDiscovery.discover_and_register(registry)
     
-    repository = get_repository(data_dir="./data")
+    repository = get_repository(data_dir=str(DATA_DIR))
     ingestion_service = IngestionService(repository)
     evaluation_service = EvaluationService(
         repository,
@@ -479,6 +481,119 @@ def create_app() -> FastAPI:
                 for t in conv.turns
             ],
         }
+
+    # =========================================================================
+    # Batch Demo Endpoints (Travel Agent Data Files)
+    # =========================================================================
+
+    @app.get("/demo/travel-conversations", tags=["Demo"])
+    async def list_travel_conversations(pattern: str = Query(default="travel_v1_*.json")):
+        """List all travel agent conversation files matching pattern."""
+        import glob
+        data_dir = DATA_DIR / "travel_agent"
+        if not data_dir.exists():
+            return {"conversations": [], "count": 0}
+        
+        files = sorted(data_dir.glob(pattern))
+        conversations = []
+        for f in files:
+            try:
+                data = json.loads(f.read_text())
+                conv_id = data.get("conversation_id", f.stem)
+                metadata = data.get("metadata", {})
+                conversations.append({
+                    "id": conv_id,
+                    "filename": f.name,
+                    "type": "issue" if "issue" in f.name else "good",
+                    "turn_count": len(data.get("turns", [])),
+                    "metadata": metadata
+                })
+            except Exception:
+                pass
+        
+        return {"conversations": conversations, "count": len(conversations)}
+
+    @app.get("/demo/travel-conversations/{conversation_id}", tags=["Demo"])
+    async def get_travel_conversation(conversation_id: str):
+        """Get full content of a travel agent conversation file."""
+        data_dir = DATA_DIR / "travel_agent"
+        
+        # Try exact match first
+        file_path = data_dir / f"{conversation_id}.json"
+        if not file_path.exists():
+            # Try pattern match
+            matches = list(data_dir.glob(f"*{conversation_id}*.json"))
+            if matches:
+                file_path = matches[0]
+            else:
+                raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
+        
+        try:
+            data = json.loads(file_path.read_text())
+            return data
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+
+    # =========================================================================
+    # Demo Endpoints (Unprocessed Conversations)
+    # =========================================================================
+
+    @app.get("/demo/unprocessed-conversations", tags=["Demo"])
+    async def list_unprocessed_conversations(pattern: str = Query(default="*.json")):
+        """List all unprocessed conversation files matching pattern."""
+        data_dir = DATA_DIR / "unprocessed"
+        if not data_dir.exists():
+            return {"conversations": [], "count": 0}
+
+        files = sorted(data_dir.glob(pattern))
+        conversations = []
+        for f in files:
+            try:
+                data = json.loads(f.read_text())
+                conv_id = data.get("conversation_id", f.stem)
+                metadata = data.get("metadata", {})
+                scenario = str(metadata.get("scenario", "")).lower()
+                conv_type = "good" if ("happy_path" in scenario or "success" in scenario) else "issue"
+                conversations.append({
+                    "id": conv_id,
+                    "filename": f.name,
+                    "type": conv_type,
+                    "turn_count": len(data.get("turns", [])),
+                    "metadata": metadata
+                })
+            except Exception:
+                pass
+
+        return {"conversations": conversations, "count": len(conversations)}
+
+    @app.get("/demo/unprocessed-conversations/{conversation_id}", tags=["Demo"])
+    async def get_unprocessed_conversation(conversation_id: str):
+        """Get full content of an unprocessed conversation file."""
+        data_dir = DATA_DIR / "unprocessed"
+
+        file_path = data_dir / f"{conversation_id}.json"
+        if file_path.exists():
+            try:
+                return json.loads(file_path.read_text())
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        for candidate in data_dir.glob("*.json"):
+            try:
+                data = json.loads(candidate.read_text())
+            except Exception:
+                continue
+            if data.get("conversation_id") == conversation_id:
+                return data
+
+        matches = list(data_dir.glob(f"*{conversation_id}*.json"))
+        if matches:
+            try:
+                return json.loads(matches[0].read_text())
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        raise HTTPException(status_code=404, detail=f"Conversation not found: {conversation_id}")
 
     # =========================================================================
     # Feedback Endpoints

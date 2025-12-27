@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pipeline Demo - Agent Evaluation</title>
+    <title>Batch Analysis Pipeline - Agent Evaluation</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -239,10 +239,6 @@
             border-color: var(--accent);
         }
 
-        .stage.error {
-            border-color: var(--error);
-        }
-
         .stage-header {
             padding: 12px 16px;
             display: flex;
@@ -287,34 +283,6 @@
             color: var(--success);
         }
 
-        .stage-status.error {
-            color: var(--error);
-        }
-
-        .stage-tools {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        .small-btn {
-            padding: 6px 10px;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            color: var(--muted);
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .small-btn:hover {
-            color: var(--accent);
-            border-color: var(--accent);
-        }
-
         .stage-content {
             display: none;
             padding: 0 16px 12px;
@@ -330,7 +298,7 @@
             padding: 10px;
             font-family: monospace;
             font-size: 11px;
-            max-height: 240px;
+            max-height: 200px;
             overflow-y: auto;
             color: var(--muted);
             white-space: pre-wrap;
@@ -361,16 +329,15 @@
         .proposal-type {
             font-size: 9px;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: rgba(99, 102, 241, 0.15);
+            background: rgba(99, 102, 241, 0.2);
             color: var(--accent);
+            padding: 2px 6px;
+            border-radius: 3px;
         }
 
         .proposal-title {
             font-size: 12px;
-            font-weight: 600;
+            font-weight: 500;
             margin-bottom: 4px;
         }
 
@@ -379,18 +346,99 @@
             color: var(--muted);
         }
 
+        /* LLM Demo */
+        .llm-demo {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .llm-demo h3 {
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+
+        .demo-compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .demo-card {
+            background: var(--bg);
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .demo-card h4 {
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+
+        .demo-card.pass h4 {
+            color: var(--success);
+        }
+
+        .demo-card.fail h4 {
+            color: var(--error);
+        }
+
+        .demo-score {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .demo-issues {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        /* Conclusion */
+        .conclusion {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(99, 102, 241, 0.1));
+            border: 1px solid var(--success);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .conclusion h3 {
+            font-size: 14px;
+            color: var(--success);
+            margin-bottom: 12px;
+        }
+
+        .conclusion p {
+            font-size: 12px;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .conclusion ul {
+            font-size: 11px;
+            color: var(--muted);
+            padding-left: 20px;
+        }
+
+        .conclusion li {
+            margin-bottom: 4px;
+        }
+
         /* Modal */
         .modal-overlay {
             position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            inset: 0;
             background: rgba(0, 0, 0, 0.7);
             display: none;
             align-items: center;
             justify-content: center;
-            z-index: 1000;
+            z-index: 100;
         }
 
         .modal-overlay.active {
@@ -399,28 +447,34 @@
 
         .modal {
             background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 12px;
             width: 90%;
-            max-width: 760px;
+            max-width: 600px;
             max-height: 80vh;
             overflow: hidden;
-            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
         }
 
         .modal-header {
             padding: 16px;
             border-bottom: 1px solid var(--border);
             display: flex;
-            align-items: center;
             justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 15px;
         }
 
         .modal-close {
             background: none;
             border: none;
             color: var(--muted);
-            cursor: pointer;
             font-size: 20px;
+            cursor: pointer;
         }
 
         .modal-close:hover {
@@ -434,11 +488,30 @@
             line-height: 1.6;
         }
 
-        .modal-pre {
-            white-space: pre-wrap;
-            font-family: monospace;
+        .modal-body h4 {
+            font-size: 13px;
+            color: var(--accent);
+            margin: 16px 0 8px;
+        }
+
+        .modal-body h4:first-child {
+            margin-top: 0;
+        }
+
+        .modal-body ul {
+            padding-left: 20px;
+            margin: 8px 0;
+        }
+
+        .modal-body li {
+            margin-bottom: 4px;
+        }
+
+        .modal-body code {
+            background: var(--bg);
+            padding: 2px 6px;
+            border-radius: 3px;
             font-size: 11px;
-            color: var(--text);
         }
 
         /* Conversation Modal */
@@ -501,107 +574,102 @@
             border-top-color: transparent;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
         }
     </style>
 </head>
 
 <body>
     <div class="app">
+        <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h2>Conversations</h2>
-                <span class="sidebar-count" id="conv-count">0</span>
+                <span class="sidebar-count" id="conv-count">15</span>
             </div>
             <div class="conv-list" id="conv-list"></div>
         </aside>
 
+        <!-- Main -->
         <main class="main">
             <div class="header">
                 <div class="header-top">
-                    <h1>🎯 Pipeline Demo</h1>
+                    <h1>📊 Batch Analysis Pipeline</h1>
                     <button class="info-btn" onclick="showDocsModal()">i</button>
                 </div>
-                <p>Pick a conversation from <code style="color:var(--text)">data/unprocessed</code> and run the full pipeline.</p>
+                <p>Staged evaluation with intelligent routing • 15 conversations • travel_assistant_v1</p>
             </div>
 
-            <button class="run-btn" id="run-btn" onclick="runPipeline()">▶ Run Pipeline</button>
+            <button class="run-btn" id="run-btn" onclick="runPipeline()">
+                ▶ Run Batch Pipeline
+            </button>
 
+            <!-- Stats -->
             <div class="stats" id="stats">
                 <div class="stat">
-                    <div class="stat-value" id="s-conv">1</div>
-                    <div class="stat-label">Conversation</div>
+                    <div class="stat-value" id="s-conv">15</div>
+                    <div class="stat-label">Conversations</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value" id="s-issues">0</div>
+                    <div class="stat-value" id="s-issues">20</div>
                     <div class="stat-label">Issues</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value" id="s-score">0.00</div>
-                    <div class="stat-label">Score</div>
+                    <div class="stat-value" id="s-score">0.72</div>
+                    <div class="stat-label">Avg Score</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value" id="s-prop">0</div>
+                    <div class="stat-value" id="s-prop">5</div>
                     <div class="stat-label">Proposals</div>
                 </div>
             </div>
 
+            <!-- Pipeline -->
             <div class="pipeline">
                 <div class="stage expanded" id="stage-1">
                     <div class="stage-header" onclick="toggleStage(1)">
                         <div class="stage-info">
-                            <span class="stage-icon">📥</span>
+                            <span class="stage-icon">📁</span>
                             <div>
-                                <div class="stage-name">1. Ingest</div>
-                                <div class="stage-desc">Ingest selected unprocessed conversation</div>
+                                <div class="stage-name">1. Load Conversations</div>
+                                <div class="stage-desc">Ingest travel_v1_*.json files</div>
                             </div>
                         </div>
                         <span class="stage-status" id="s1-status">Ready</span>
                     </div>
-                <div class="stage-content">
-                    <div class="stage-output" id="s1-out">Select a conversation from the sidebar.</div>
-                    <div class="stage-tools">
-                        <button class="small-btn" onclick="showRawModal(1)">Raw</button>
+                    <div class="stage-content">
+                        <div class="stage-output" id="s1-out">Waiting to start...</div>
                     </div>
-                </div>
                 </div>
 
                 <div class="stage" id="stage-2">
                     <div class="stage-header" onclick="toggleStage(2)">
                         <div class="stage-info">
-                            <span class="stage-icon">🤖</span>
+                            <span class="stage-icon">⚡</span>
                             <div>
-                                <div class="stage-name">2. Evaluate</div>
-                                <div class="stage-desc">Run all evaluators for this conversation</div>
+                                <div class="stage-name">2. Heuristic Stage</div>
+                                <div class="stage-desc">heuristic, tool_call, tool_causality</div>
                             </div>
                         </div>
                         <span class="stage-status" id="s2-status">Waiting</span>
                     </div>
                     <div class="stage-content">
                         <div class="stage-output" id="s2-out">Waiting for Stage 1...</div>
-                        <div class="stage-tools">
-                            <button class="small-btn" onclick="showRawModal(2)">Raw</button>
-                        </div>
                     </div>
                 </div>
 
                 <div class="stage" id="stage-3">
                     <div class="stage-header" onclick="toggleStage(3)">
                         <div class="stage-info">
-                            <span class="stage-icon">👤</span>
+                            <span class="stage-icon">🤖</span>
                             <div>
-                                <div class="stage-name">3. Feedback</div>
-                                <div class="stage-desc">Submit a demo human-review signal</div>
+                                <div class="stage-name">3. LLM Judge</div>
+                                <div class="stage-desc">Semantic analysis on filtered subset</div>
                             </div>
                         </div>
                         <span class="stage-status" id="s3-status">Waiting</span>
                     </div>
                     <div class="stage-content">
                         <div class="stage-output" id="s3-out">Waiting for Stage 2...</div>
-                        <div class="stage-tools">
-                            <button class="small-btn" onclick="showRawModal(3)">Raw</button>
-                        </div>
                     </div>
                 </div>
 
@@ -610,8 +678,8 @@
                         <div class="stage-info">
                             <span class="stage-icon">🧠</span>
                             <div>
-                                <div class="stage-name">4. Analyze</div>
-                                <div class="stage-desc">Cluster failures → Generate proposals</div>
+                                <div class="stage-name">4. Pattern Analysis</div>
+                                <div class="stage-desc">Cluster issues → Generate proposals</div>
                             </div>
                         </div>
                         <span class="stage-status" id="s4-status">Waiting</span>
@@ -619,34 +687,103 @@
                     <div class="stage-content">
                         <div class="stage-output" id="s4-out">Waiting for Stage 3...</div>
                         <div class="proposals" id="proposals"></div>
-                        <div class="stage-tools">
-                            <button class="small-btn" onclick="showRawModal(4)">Raw</button>
-                        </div>
                     </div>
                 </div>
+            </div>
 
-                <div class="stage" id="stage-5">
-                    <div class="stage-header" onclick="toggleStage(5)">
-                        <div class="stage-info">
-                            <span class="stage-icon">💡</span>
-                            <div>
-                                <div class="stage-name">5. Regression</div>
-                                <div class="stage-desc">Verify top proposal on golden dataset</div>
-                            </div>
-                        </div>
-                        <span class="stage-status" id="s5-status">Waiting</span>
+            <!-- LLM Demo -->
+            <div class="llm-demo" id="llm-demo">
+                <h3>🔍 LLM Judge Depth: travel_v1_issue_010</h3>
+                <p style="font-size:11px;color:var(--muted);margin-bottom:12px">
+                    Passed all heuristic checks but LLM detected ignored user preferences (business class, budget, meal
+                    service).
+                </p>
+                <div class="demo-compare">
+                    <div class="demo-card pass">
+                        <h4>✅ Heuristic</h4>
+                        <div class="demo-score">1.00</div>
+                        <div class="demo-issues">0 issues</div>
                     </div>
-                    <div class="stage-content">
-                        <div class="stage-output" id="s5-out">Waiting for Stage 4...</div>
-                        <div class="stage-tools">
-                            <button class="small-btn" onclick="showRawModal(5)">Raw</button>
-                        </div>
+                    <div class="demo-card fail">
+                        <h4>❌ LLM Judge</h4>
+                        <div class="demo-score">0.57</div>
+                        <div class="demo-issues">2 issues</div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Conclusion -->
+            <div class="conclusion" id="conclusion">
+                <h3>✅ Pipeline Complete — Interpreting Results</h3>
+                <p><strong>What this demonstrates:</strong></p>
+                <ul>
+                    <li><strong>Staged Evaluation:</strong> Heuristics (fast) filter conversations before expensive LLM
+                        analysis</li>
+                    <li><strong>11/15 conversations</strong> had issues detected, triggering LLM evaluation</li>
+                    <li><strong>5 distinct failure patterns</strong> were clustered and proposals generated</li>
+                    <li><strong>Average score 0.72</strong> indicates room for improvement in agent behavior</li>
+                </ul>
+                <p style="margin-top:12px"><strong>Next steps:</strong></p>
+                <ul>
+                    <li>Review generated proposals in Stage 4</li>
+                    <li>Apply promising proposals via <code>/analysis/proposals/{id}/apply</code></li>
+                    <li>Run regression tests to validate improvements</li>
+                </ul>
             </div>
         </main>
     </div>
 
+    <!-- Docs Modal -->
+    <div class="modal-overlay" id="docs-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>📘 Test Setup & Methodology</h3>
+                <button class="modal-close" onclick="closeModal('docs-modal')">×</button>
+            </div>
+            <div class="modal-body">
+                <h4>Agent Configuration</h4>
+                <ul>
+                    <li><strong>Agent:</strong> Travel Assistant (<code>travel_assistant_v1</code>)</li>
+                    <li><strong>Prompt:</strong> <code>artifacts/prompts/prompt_v1.txt</code></li>
+                    <li><strong>Tools:</strong> flight_search, hotel_search with standard schemas</li>
+                </ul>
+
+                <h4>Conversation Generation</h4>
+                <p>Generated 15 conversations with controlled issue patterns:</p>
+                <ul>
+                    <li><strong>8 with issues</strong> (53% failure rate)</li>
+                    <li><strong>7 without issues</strong> (47% success rate)</li>
+                </ul>
+
+                <h4>Embedded Failure Patterns</h4>
+                <ul>
+                    <li><strong>Date Format Issues (3):</strong> Invalid formats like <code>03/15/2024</code> instead of
+                        <code>2024-03-15</code></li>
+                    <li><strong>Missing Preferences (4):</strong> User specifies requirements but assistant ignores them
+                    </li>
+                    <li><strong>Incomplete Responses (2):</strong> Minimal info despite detailed requests</li>
+                    <li><strong>Parameter Validation (2):</strong> Missing required params or invalid combinations</li>
+                </ul>
+
+                <h4>Evaluation Strategy</h4>
+                <p><strong>Two-stage approach:</strong></p>
+                <ul>
+                    <li><strong>Heuristic Stage:</strong> Fast rule-based checks on ALL conversations</li>
+                    <li><strong>LLM Stage:</strong> Deep semantic analysis only on conversations with issues (cost
+                        optimization)</li>
+                </ul>
+
+                <h4>Key Insights</h4>
+                <ul>
+                    <li>Heuristics catch technical issues; LLM catches semantic/quality issues</li>
+                    <li>Some conversations pass heuristics but fail LLM (e.g., travel_v1_issue_010)</li>
+                    <li>Pattern clustering enables automatic proposal generation</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Conversation Modal -->
     <div class="modal-overlay" id="conv-modal">
         <div class="modal">
             <div class="modal-header">
@@ -657,40 +794,7 @@
         </div>
     </div>
 
-    <div class="modal-overlay" id="docs-modal">
-        <div class="modal">
-            <div class="modal-header">
-                <h3>Pipeline Demo</h3>
-                <button class="modal-close" onclick="closeModal('docs-modal')">×</button>
-            </div>
-            <div class="modal-body">
-                <p style="color:var(--muted);font-size:13px;margin-bottom:10px">
-                    This page runs the real API pipeline on one conversation loaded from <code>data/unprocessed</code>.
-                </p>
-                <ul style="padding-left:18px;color:var(--muted);font-size:12px;line-height:1.7">
-                    <li><strong style="color:var(--text)">Stage 1:</strong> Ingest selected conversation</li>
-                    <li><strong style="color:var(--text)">Stage 2:</strong> Evaluate with all enabled evaluators</li>
-                    <li><strong style="color:var(--text)">Stage 3:</strong> Submit demo feedback</li>
-                    <li><strong style="color:var(--text)">Stage 4:</strong> Run analysis cycle (proposals)</li>
-                    <li><strong style="color:var(--text)">Stage 5:</strong> Verify top proposal (regression)</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="raw-modal">
-        <div class="modal">
-            <div class="modal-header">
-                <h3 id="raw-modal-title">Raw Output</h3>
-                <button class="modal-close" onclick="closeModal('raw-modal')">×</button>
-            </div>
-            <div class="modal-body">
-                <pre class="modal-pre" id="raw-modal-body">No output yet.</pre>
-            </div>
-        </div>
-    </div>
-
-    <script src="js/pipeline.js"></script>
+    <script src="js/pipeline_batch.js"></script>
 </body>
 
 </html>
