@@ -23,7 +23,22 @@ class PipelineProcessor:
         repository: ConversationRepository | None = None,
         source_dir: str | Path = "data/unprocessed",
         processed_dir: str | Path = "data/processed",
+        enabled_evaluators: list[str] | None = None,
     ):
+        """Initialize the pipeline processor.
+        
+        Args:
+            repository: Optional repository instance. Uses default if not provided.
+            source_dir: Directory to load unprocessed JSON files from.
+            processed_dir: Directory to move processed files to.
+            enabled_evaluators: List of evaluator names to use. Options:
+                - "llm_judge": LLM-as-Judge (slowest, ~500ms, requires OpenAI key)
+                - "heuristic": Fast format/latency checks (~1ms)
+                - "tool_call": Tool selection/parameter validation (~5ms)
+                - "tool_causality": Hallucination detection (~10ms)
+                - "coherence": Multi-turn context tracking (~10ms)
+                If None, uses all enabled evaluators from config.
+        """
         self.repository = repository or get_repository(data_dir="./data")
         self.source_dir = Path(source_dir)
         self.processed_dir = Path(processed_dir)
@@ -32,9 +47,15 @@ class PipelineProcessor:
         EvaluatorDiscovery.discover_and_register(registry)
 
         self.ingestion_service = IngestionService(self.repository)
-        self.evaluation_service = EvaluationService(self.repository, registry)
+        self.evaluation_service = EvaluationService(
+            self.repository,
+            registry,
+            enabled_evaluators=enabled_evaluators,
+        )
         self.analysis_service = AnalysisService(self.repository, self.evaluation_service)
         self.feedback_service = FeedbackService(self.repository)
+        
+        self._enabled_evaluators = self.evaluation_service.enabled_evaluators
 
     def run(
         self,
@@ -62,8 +83,8 @@ class PipelineProcessor:
 
         evaluations = []
         if evaluate_pending:
-            evaluations = self.evaluation_service.evaluate_pending(force=True)
-
+            evaluations = self.evaluation_service.evaluate_pending(force=False)
+        
         return {
             "ingestion": result,
             "evaluations": evaluations,
@@ -72,6 +93,7 @@ class PipelineProcessor:
     def run_analysis(self, limit: int = 100):
         """Run failure pattern detection and proposal generation."""
         return self.analysis_service.run_analysis_cycle(limit=limit)
+
 
     def flag_for_review(
         self,
